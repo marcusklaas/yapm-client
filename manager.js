@@ -6,6 +6,24 @@ function passwordEntry() {
 	this.comment = '';
 }
 
+function randPass(len, alphabet) {
+	var result = '';
+
+	if (!alphabet)
+		alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+		 + '.,?:;[]~!@#$%^&*()-+/';
+	var alphabetLength = alphabet.length;
+
+	if ((len === undefined) || isNaN(len)) len = 12;
+
+	for (var i = 0; i < len; i++) {
+		var rnd = Math.floor(Math.random() * alphabetLength);
+		result += alphabet.substring(rnd, rnd + 1);
+	}
+
+	return result;
+}
+
 function createPasswordList(size) {
 	var i = 0;
 	var list = new Array(size);
@@ -33,30 +51,84 @@ function addCell(row, text) {
 	row.appendChild(node);
 }
 
-function addRow(tbody, pass) {
-	var row = document.createElement('tr');
-	addCell(row, pass.title);
-	addCell(row, pass.url);
-	addObscuredCell(row, pass.username);
-	addObscuredCell(row, pass.password);
-	addCell(row, pass.comment);
-	tbody.appendChild(row);
-}
-
-function displayList(list) {
-	var i = 0;
-	var pwdEntry = null;
-	var tableBody = document.getElementById('overview').lastChild;
-
-	for(i = 0; i < list.length; i++)
-		addRow(tableBody, list[i]);
-}
-
 window.onload = function() {
 	var testPassword = 'jehova66';
 	var password, passHash, dec, enc, list = null;
 	var generateAES = false;
 	var request = new XMLHttpRequest();
+
+	function deletePassword(evt) {
+		evt.preventDefault();
+
+		if(!confirm("Are you totally sure you want to delete this password?"))
+			return;
+
+		var i = 0, row = this.parentNode.parentNode;
+
+		for(child = row; (child = child.previousSibling) != null; i++);
+
+		list.splice(i, 1);
+		row.parentNode.removeChild(row);
+		sendUpdate();
+		
+	}
+
+	function toggleVisibility(evt) {
+		var row = this.parentNode.parentNode;
+		var currentVisibility = row.className == 'exposed';
+
+		row.className = currentVisibility ? '' : 'exposed';
+		this.innerHTML = currentVisibility ? 'show' : 'hide';
+		evt.preventDefault();
+	}
+
+	function editPassword(evt) {}
+
+	function addLinks(row) {
+		var node = document.createElement('td');
+		var link = document.createElement('a');
+		link.href = '#';
+		link.className = 'toggleVisibility';
+		link.innerHTML = 'show';
+		link.addEventListener('click', toggleVisibility);
+		node.appendChild(link);
+
+		link = document.createElement('a');
+		link.href = '#';
+		link.className = 'editPassword';
+		link.innerHTML = 'edit';
+		link.addEventListener('click', editPassword);
+		node.appendChild(link);
+
+		link = document.createElement('a');
+		link.href = '#';
+		link.className = 'deletePassword';
+		link.innerHTML = 'x';
+		link.addEventListener('click', deletePassword);
+		node.appendChild(link);
+
+		row.appendChild(node);
+	}
+
+	function addRow(tbody, pass) {
+		var row = document.createElement('tr');
+		addCell(row, pass.title);
+		addCell(row, pass.url);
+		addObscuredCell(row, pass.username);
+		addObscuredCell(row, pass.password);
+		addCell(row, pass.comment);
+		addLinks(row);
+		tbody.appendChild(row);
+	}
+
+	function displayList(list) {
+		var i = 0;
+		var pwdEntry = null;
+		var tableBody = document.getElementById('overview').lastChild;
+
+		for(i = 0; i < list.length; i++)
+			addRow(tableBody, list[i]);
+	}
 
 	function sendUpdate() {
 		var request = new XMLHttpRequest();
@@ -104,6 +176,8 @@ window.onload = function() {
 			document.getElementById('testing').innerHTML = dec;
 			list = JSON.parse(dec);
 			displayList(list);
+			document.getElementById('authorized').className = '';
+			document.getElementById('unauthorized').className = 'hidden';
 		}
 		catch(e) {
 			document.getElementById('testing').innerHTML = 'decryption failed: ' + e;
@@ -132,6 +206,13 @@ window.onload = function() {
 			sendUpdate(list);
 		}
 
+		evt.preventDefault();
+	});
+
+	document.getElementById('randPass').addEventListener('click', function(evt) {
+		document.getElementById('newPass').value =
+		 document.getElementById('newPassRepeat').value =
+		 randPass(12, false);
 		evt.preventDefault();
 	});
 }

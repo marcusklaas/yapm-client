@@ -1,0 +1,32 @@
+@font-face {  
+	font-family: password;  
+	src: url(password.ttf) format("truetype");  
+}
+
+a:not(:last-child) {
+	margin-right: .5em;
+}
+
+.hidden {
+	display: none;
+}
+
+table {
+	width: 100%;
+}
+
+#testing {
+	width: 800;
+	height: 500;
+}
+
+tr:not(.exposed) td .obscured {
+	display: inline;
+	overflow: hidden;
+	/* width: 2em; */
+	font-family: password;
+}
+
+#newPassword * {
+	clear: both;
+}

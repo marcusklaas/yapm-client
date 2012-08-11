@@ -1,65 +1,47 @@
 <html>
+
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
 <title>Passwords</title>
 <script src="gibberish-aes.js"></script>
 <script src="sha1.js"></script>
 <script src="manager.js"></script>
-<style>
-@font-face {  
-	font-family: password;  
-	src: url(password.ttf) format("truetype");  
-}
-
-#testing {
-	width: 800;
-	height: 500;
-}
-
-.obscured {
-	overflow: hidden;
-	width: 2em;
-	font-family: password;
-}
-
-#newPassword * {
-	clear: both;
-}
-</style>
-
+<link rel="stylesheet" type="text/css" href="style.css" />
 </head>
-<body>
 
+<body>
 <emph>Make sure you view this page over HTTPS!</emph>
 
 <br/><textarea id="testing"></textarea>
 
-<form id="decrypt">
-<input type="password" id="encryptionKey">
-<input type="submit" value="decrypt">
-</form>
+<section id="unauthorized">
+	<form id="decrypt">
+		<input type="password" id="encryptionKey">
+		<input type="submit" value="decrypt">
+	</form>
+</section>
 
-<table id="overview">
-	<thead>
-		<tr>
-			<th>title</th><th>url</th><th>username</th><th>password</th><th>comment</th>
-		</tr>
-	</thead>
-<tbody></tbody></table>
+<section id="authorized" class="hidden">
+	<table id="overview">
+		<thead>
+			<tr>
+				<th>title</th><th>url</th><th>username</th><th>password</th><th>comment</th><th></th>
+			</tr>
+		</thead>
+	<tbody></tbody></table>
 
-<form id="newPassword">
-<input type="text" id="newTitle" placeholder="title">
-<input type="url" id="newURL" placeholder="url">
-<input type="text" id="newUsername" placeholder="username">
-<input type="password" id="newPass" placeholder="password">
-<input type="password" id="newPassRepeat" placeholder="password-repeat">
-<button id="randPass">Generate random password</button>
-<textarea id="newComment">comment</textarea>
-<input type="submit" id="submitNew" value="Add">
-</form>
+	<form id="newPassword">
+		<input type="text" id="newTitle" placeholder="title">
+		<input type="url" id="newURL" placeholder="url">
+		<input type="text" id="newUsername" placeholder="username">
+		<input type="password" id="newPass" placeholder="password">
+		<input type="password" id="newPassRepeat" placeholder="password-repeat">
+		<button id="randPass">Generate random password</button>
+		<textarea id="newComment">comment</textarea>
+		<input type="submit" id="submitNew" value="Add">
+	</form>
+</section>
 
-</form>
-
-</table>
 </body>
+
 </html>

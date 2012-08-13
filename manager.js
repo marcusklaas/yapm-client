@@ -54,7 +54,6 @@ function addCell(row, text) {
 window.onload = function() {
 	var testPassword = 'jehova66';
 	var password, passHash, dec, enc, list = null;
-	var lastKeyHit = Date.now(), timeout = 500;
 	var generateAES = false;
 	var request = new XMLHttpRequest();
 
@@ -280,13 +279,6 @@ window.onload = function() {
 	}
 
 	document.getElementById('filter').addEventListener('keyup', function(evt) {
-		var now = Date.now();
-		var valid = (now - lastKeyHit < timeout);
-		lastKeyHit = now;
-
-		if(!valid && this.value.length > 1)
-			return;
-
 		filterPasswords(this.value);
 	});
 }

@@ -79,7 +79,6 @@ window.onload = function() {
 
 	document.getElementById('overlay').addEventListener('click', closeDialog);
 	document.getElementById('modalClose1').addEventListener('click', closeDialog);
-	document.getElementById('modalClose2').addEventListener('click', closeDialog);
 
 	document.getElementById('save').addEventListener('click', function(evt) {
 		evt.preventDefault();
@@ -93,7 +92,7 @@ window.onload = function() {
 		pwdEntry.comment = document.getElementById('comment').value;
 
 		if(pwdEntry.password !== document.getElementById('passRepeat').value) {
-			alert('passwords not identical!');
+			alert('Passwords do not match!');
 			return;
 		}
 
@@ -116,7 +115,7 @@ window.onload = function() {
 			node.firstChild.innerHTML = pwdEntry.username;
 			node = node.nextSibling;
 			node.firstChild.innerHTML = pwdEntry.password;
-			node.nextSibling.value = pwdEntry.comment;
+			node.nextSibling.innerHTML = pwdEntry.comment;
 		}
 	
 		sendUpdate(list);
@@ -144,7 +143,7 @@ window.onload = function() {
 		var currentVisibility = row.className == 'exposed';
 
 		row.className = currentVisibility ? '' : 'exposed';
-		this.innerHTML = currentVisibility ? 'show' : 'hide';
+		this.innerHTML = currentVisibility ? '<i class="icon-eye-open"></i>' : '<i class="icon-eye-close"></i>';
 		evt.preventDefault();
 	}
 
@@ -162,21 +161,21 @@ window.onload = function() {
 		var link = document.createElement('a');
 		link.href = '#';
 		link.className = 'toggleVisibility';
-		link.innerHTML = 'show';
+		link.innerHTML = '<i class="icon-eye-open"></i>';
 		link.addEventListener('click', toggleVisibility);
 		node.appendChild(link);
 
 		link = document.createElement('a');
 		link.href = '#';
 		link.className = 'editPassword';
-		link.innerHTML = 'edit';
+		link.innerHTML = '<i class="icon-edit"></i>';
 		link.addEventListener('click', editPassword);
 		node.appendChild(link);
 
 		link = document.createElement('a');
 		link.href = '#';
 		link.className = 'deletePassword';
-		link.innerHTML = 'x';
+		link.innerHTML = '<i class="icon-trash"></i>';
 		link.addEventListener('click', deletePassword);
 		node.appendChild(link);
 

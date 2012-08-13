@@ -1,6 +1,6 @@
 @font-face {  
 	font-family: password;  
-	src: url(password.ttf) format("truetype");  
+	src: url('font/password.ttf') format('truetype');  
 }
 
 body {
@@ -25,10 +25,6 @@ a:not(:last-child) {
 	z-index: 10;
 }
 
-.modal {
-	z-index: 11;
-}
-
 table {
 	width: 100%;
 }
@@ -44,8 +40,4 @@ tr:not(.exposed) td .obscured {
 	overflow: hidden;
 	/* width: 2em; */
 	font-family: password;
-}
-
-#newPassword * {
-	clear: both;
 }

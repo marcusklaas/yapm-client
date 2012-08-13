@@ -1,4 +1,5 @@
-<html>
+<!DOCTYPE html>
+<html lang="en">
 
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
@@ -8,6 +9,7 @@
 <script src="manager.js"></script>
 <link rel="stylesheet" type="text/css" href="style.css" />
 <link rel="stylesheet" type="text/css" href="bootstrap.css" />
+<link rel="stylesheet" type="text/css" href="font-awesome.css" />
 </head>
 
 <body>
@@ -15,24 +17,26 @@
 <textarea id="testing"></textarea>
 
 <section id="unauthorized">
-	<form id="decrypt" autocomplete="off">
+	<form id="decrypt" class="well form-inline" autocomplete="off">
 		<input type="password" id="encryptionKey">
-		<input type="submit" value="decrypt">
+		<a href="#" class="btn"><i class="icon-key"></i> Decrypt</a>
 	</form>
 </section>
 
 <section id="authorized" class="hidden">
-	<input type="text" id="filter" placeholder="filter">
+	<form class="form-search">
+		<input type="text" id="filter" placeholder="filter" class="search-query">
+	</form>
 
-	<table id="overview">
+	<table class="table table-striped" id="overview">
 		<thead>
 			<tr>
-				<th>title</th><th>url</th><th>username</th><th>password</th><th>comment</th><th></th>
+				<th>Title</th><th>URL</th><th>Username</th><th>Password</th><th>Comment</th><th></th>
 			</tr>
 		</thead>
 	<tbody></tbody></table>
 
-	<button id="newPassword">New password</button>
+	<button id="newPassword" class="btn"><i class="icon-plus"></i> New password</button>
 
 	<div class="hidden" id="overlay"></div>
 
@@ -41,18 +45,54 @@
 			<button type="button" class="close" id="modalClose1">×</button>
 			<h3 id="modalHeader">Edit password</h3>
 		</div>
-		<form id="newPassword" autocomplete="off">
-			<input type="text" id="title" placeholder="title">
-			<input type="url" id="URL" placeholder="url">
-			<input type="text" id="username" placeholder="username">
-			<input type="password" id="pass" placeholder="password">
-			<input type="password" id="passRepeat" placeholder="password-repeat">
-			<textarea id="comment">comment</textarea>
+		<form id="newPassword" class="modal-body form-horizontal" autocomplete="off">
+
+			<div class="control-group">
+				<label class="control-label" for="title">Title</label>
+				<div class="controls">
+					<input type="text" id="title" placeholder="">
+				</div>
+			</div>
+
+			<div class="control-group">
+				<label class="control-label" for="URL">URL</label>
+				<div class="controls">
+					<input type="url" id="URL" placeholder="">
+				</div>
+			</div>
+
+			<div class="control-group">
+				<label class="control-label" for="username">Username</label>
+				<div class="controls">
+					<input type="text" id="username" placeholder="">
+				</div>
+			</div>
+
+			<div class="control-group">
+				<label class="control-label" for="pass">Password</label>
+				<div class="controls">
+					<input type="password" id="pass" placeholder="">
+				</div>
+			</div>
+
+			<div class="control-group">
+				<label class="control-label" for="passRepeat">Password Repeat</label>
+				<div class="controls">
+					<input type="password" id="passRepeat" placeholder="">
+				</div>
+			</div>
+
+			<div class="control-group">
+				<label class="control-label" for="comment">Comment</label>
+				<div class="controls">
+					<textarea id="comment"></textarea>
+				</div>
+			</div>
+
 		</form>
 		<div class="modal-footer">
-			<a href="#" class="btn" id="randPass">Random password</a>
-			<a href="#" class="btn" id="modalClose2">Close</a>
-			<a href="#" class="btn btn-primary" id="save">Save</a>
+			<a href="#" class="btn" id="randPass"><i class="icon-random"></i> Random Password</a>
+			<a href="#" class="btn btn-primary" id="save"><i class="icon-save"></i> Save</a>
 		</div>
 	</div>
 </section>

@@ -54,8 +54,74 @@ function addCell(row, text) {
 window.onload = function() {
 	var testPassword = 'jehova66';
 	var password, passHash, dec, enc, list = null;
+	var lastKeyHit = Date.now(), timeout = 500;
 	var generateAES = false;
 	var request = new XMLHttpRequest();
+
+	function closeDialog() {
+		document.getElementById('overlay').className = 'hidden';
+		document.getElementById('editModal').classList.add('hidden');
+	}
+
+	/* index -1 means new */
+	function editDialog(index) {
+		document.getElementById('overlay').className = '';
+		document.getElementById('editModal').classList.remove('hidden');
+		document.getElementById('editModal').setAttribute('data-index', index);
+		document.getElementById('modalHeader').innerHTML = (index === -1) ? 'New password' : 'Edit password';
+		document.getElementById('title').value = (index === -1) ? '' : list[index].title;
+		document.getElementById('URL').value = (index === -1) ? '' : list[index].url;
+		document.getElementById('username').value = (index === -1) ? '' : list[index].username;
+		document.getElementById('pass').value = document.getElementById('passRepeat').value =
+		 (index === -1) ? '' : list[index].password;
+		document.getElementById('comment').innerHTML = (index === -1) ? '' : list[index].comment;
+	}
+
+	document.getElementById('overlay').addEventListener('click', closeDialog);
+	document.getElementById('modalClose1').addEventListener('click', closeDialog);
+	document.getElementById('modalClose2').addEventListener('click', closeDialog);
+
+	document.getElementById('save').addEventListener('click', function(evt) {
+		evt.preventDefault();
+
+		var index = parseInt(document.getElementById('editModal').getAttribute('data-index'));
+		var pwdEntry = new passwordEntry;
+		pwdEntry.title = document.getElementById('title').value;
+		pwdEntry.url = document.getElementById('URL').value;
+		pwdEntry.username = document.getElementById('username').value;
+		pwdEntry.password = document.getElementById('pass').value;
+		pwdEntry.comment = document.getElementById('comment').value;
+
+		if(pwdEntry.password !== document.getElementById('passRepeat').value) {
+			alert('passwords not identical!');
+			return;
+		}
+
+		if(index === -1) {
+			list.push(pwdEntry);
+			addRow(document.getElementById('overview').lastChild, pwdEntry);
+		}
+		else {
+			list[index] = pwdEntry;
+			
+			var node = document.getElementById('overview').lastChild.firstChild;
+			while(index--)
+				node = node.nextSibling;
+
+			node = node.firstChild;
+			node.innerHTML = pwdEntry.title;
+			node = node.nextSibling;
+			node.innerHTML = pwdEntry.url;
+			node = node.nextSibling;
+			node.firstChild.innerHTML = pwdEntry.username;
+			node = node.nextSibling;
+			node.firstChild.innerHTML = pwdEntry.password;
+			node.nextSibling.value = pwdEntry.comment;
+		}
+	
+		sendUpdate(list);
+		closeDialog();
+	});
 
 	function deletePassword(evt) {
 		evt.preventDefault();
@@ -82,7 +148,14 @@ window.onload = function() {
 		evt.preventDefault();
 	}
 
-	function editPassword(evt) {}
+	function editPassword(evt) {
+		var row = this.parentNode.parentNode;
+		var i = 0;
+
+		for(child = row; (child = child.previousSibling) !== null; i++);
+
+		editDialog(i);
+	}
 
 	function addLinks(row) {
 		var node = document.createElement('td');
@@ -135,9 +208,7 @@ window.onload = function() {
 
 		request.onreadystatechange = function() {
 			if(this.readyState === 4 && this.status === 200) {
-				if(this.responseText === 'success')
-					alert('lib successfully updated');
-				else
+				if(this.responseText !== 'success')
 					alert('lib update failed ' + this.responseText);
 			}
 		};
@@ -186,33 +257,37 @@ window.onload = function() {
 		evt.preventDefault();
 	});
 
-	document.getElementById('newPassword').addEventListener('submit', function(evt) {
-		if(list !== null) {
-			var pwdEntry = new passwordEntry;
-			pwdEntry.title = document.getElementById('newTitle').value;
-			pwdEntry.url = document.getElementById('newURL').value;
-			pwdEntry.username = document.getElementById('newUsername').value;
-			pwdEntry.password = document.getElementById('newPass').value;
-			pwdEntry.comment = document.getElementById('newComment').innerHTML;
-			
-			if(pwdEntry.password !== document.getElementById('newPassRepeat').value) {
-				alert('passwords not identical!');
-				evt.preventDefault();
-				return;
-			}
-
-			list.push(pwdEntry);
-			addRow(document.getElementById('overview').lastChild, pwdEntry);
-			sendUpdate(list);
-		}
-
+	document.getElementById('randPass').addEventListener('click', function(evt) {
+		document.getElementById('pass').value =
+		 document.getElementById('passRepeat').value =
+		 randPass(12, false);
 		evt.preventDefault();
 	});
 
-	document.getElementById('randPass').addEventListener('click', function(evt) {
-		document.getElementById('newPass').value =
-		 document.getElementById('newPassRepeat').value =
-		 randPass(12, false);
+	document.getElementById('newPassword').addEventListener('click', function(evt) {
 		evt.preventDefault();
+		editDialog(-1);
+	});
+
+	function filterPasswords(val) {
+		var row = document.getElementById('overview').lastChild.firstChild;
+		val = val.toLowerCase();
+
+		for(var i = 0; i < list.length; i++, row = row.nextSibling)
+			if(-1 === list[i].title.toLowerCase().indexOf(val))
+				row.classList.add('hidden');
+			else
+				row.classList.remove('hidden');
+	}
+
+	document.getElementById('filter').addEventListener('keyup', function(evt) {
+		var now = Date.now();
+		var valid = (now - lastKeyHit < timeout);
+		lastKeyHit = now;
+
+		if(!valid && this.value.length > 1)
+			return;
+
+		filterPasswords(this.value);
 	});
 }

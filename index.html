@@ -7,21 +7,23 @@
 <script src="sha1.js"></script>
 <script src="manager.js"></script>
 <link rel="stylesheet" type="text/css" href="style.css" />
+<link rel="stylesheet" type="text/css" href="bootstrap.css" />
 </head>
 
 <body>
-<emph>Make sure you view this page over HTTPS!</emph>
 
-<br/><textarea id="testing"></textarea>
+<textarea id="testing"></textarea>
 
 <section id="unauthorized">
-	<form id="decrypt">
+	<form id="decrypt" autocomplete="off">
 		<input type="password" id="encryptionKey">
 		<input type="submit" value="decrypt">
 	</form>
 </section>
 
 <section id="authorized" class="hidden">
+	<input type="text" id="filter" placeholder="filter">
+
 	<table id="overview">
 		<thead>
 			<tr>
@@ -30,16 +32,29 @@
 		</thead>
 	<tbody></tbody></table>
 
-	<form id="newPassword">
-		<input type="text" id="newTitle" placeholder="title">
-		<input type="url" id="newURL" placeholder="url">
-		<input type="text" id="newUsername" placeholder="username">
-		<input type="password" id="newPass" placeholder="password">
-		<input type="password" id="newPassRepeat" placeholder="password-repeat">
-		<button id="randPass">Generate random password</button>
-		<textarea id="newComment">comment</textarea>
-		<input type="submit" id="submitNew" value="Add">
-	</form>
+	<button id="newPassword">New password</button>
+
+	<div class="hidden" id="overlay"></div>
+
+	<div class="modal hidden" id="editModal">
+		<div class="modal-header">
+			<button type="button" class="close" id="modalClose1">×</button>
+			<h3 id="modalHeader">Edit password</h3>
+		</div>
+		<form id="newPassword" autocomplete="off">
+			<input type="text" id="title" placeholder="title">
+			<input type="url" id="URL" placeholder="url">
+			<input type="text" id="username" placeholder="username">
+			<input type="password" id="pass" placeholder="password">
+			<input type="password" id="passRepeat" placeholder="password-repeat">
+			<textarea id="comment">comment</textarea>
+		</form>
+		<div class="modal-footer">
+			<a href="#" class="btn" id="randPass">Random password</a>
+			<a href="#" class="btn" id="modalClose2">Close</a>
+			<a href="#" class="btn btn-primary" id="save">Save</a>
+		</div>
+	</div>
 </section>
 
 </body>

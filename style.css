@@ -3,6 +3,10 @@
 	src: url('font/password.ttf') format('truetype');  
 }
 
+#decrypt {
+	display: inline-block;
+}
+
 body {
 	padding: 2em;
 }

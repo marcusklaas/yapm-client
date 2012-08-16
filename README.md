@@ -18,7 +18,7 @@ INSTALL GUIDE
 =============
 you should have php installed for your http server. set the raw double-sha1 hash of your masterpassword.
 
-then fill passwords.txt with the encrypted json-string [] using your master password. encrypt it using ghiberishAES javascript function (default settings) or run [code]echo "[]" | openssl enc -aes-256-cbc -a -k URPASSWORD >passwords.txt[/code] in the directory containing passwords.txt
+then fill passwords.txt with the encrypted json-string [] using your master password. encrypt it using ghiberishAES javascript function (default settings) or run <code>echo "[]" | openssl enc -aes-256-cbc -a -k URPASSWORD >passwords.txt</code> in the directory containing passwords.txt
 
 u all done!
 

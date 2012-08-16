@@ -1,11 +1,11 @@
 <?php
 
-$hash = sha1('jehova66');
+$doubleHash = '4ca45598c9a0c4c4366d33d6dfb89e77122d2f74';
 $pwlib = 'passwords';
 $pwlibext = 'txt';
 
 if(isset($_POST['pwhash']) && isset($_POST['newlib'])) {
-	if($_POST['pwhash'] !== $hash)
+	if(sha1($_POST['pwhash']) !== $doubleHash)
 		die('incorrect password');
 
 	$i = 1;

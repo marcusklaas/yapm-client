@@ -22,7 +22,7 @@ a:not(:last-child) {
 #overlay {
 	width: 100%;
 	height: 100%;
-	position: absolute;
+	position: fixed;
 	top: 0;
 	left: 0;
 	background-color: rgba(0, 0, 0, 0.5);
@@ -39,9 +39,18 @@ table {
 	height: 500;
 }
 
-tr:not(.exposed) td .obscured {
-	display: inline;
+td {
 	overflow: hidden;
-	/* width: 2em; */
+	white-space: nowrap;
+	text-overflow: ellipsis;
+	/* max-width: ; */
+}
+
+tr:not(.exposed) td .obscured {
+	display: inline-block;
+	white-space: nowrap;
+	overflow: hidden;
+	max-width: 4em;
 	font-family: password;
+	word-spacing: -.30em;
 }

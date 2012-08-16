@@ -36,11 +36,24 @@ function createPasswordList(size) {
 	return list;
 }
 
+function selectText() {
+	if (document.selection) {
+		var range = document.body.createTextRange();
+		range.moveToElementText(this);
+		range.select();
+	} else if (window.getSelection) {
+		var range = document.createRange();
+		range.selectNode(this);
+		window.getSelection().addRange(range);
+	}
+}
+
 function addObscuredCell(row, text) {
 	var node = document.createElement('td');
 	var span = document.createElement('div');
 	span.className = 'obscured';
 	span.innerHTML = text;
+	span.addEventListener('click', selectText);
 	node.appendChild(span);
 	row.appendChild(node);
 }
@@ -52,10 +65,20 @@ function addCell(row, text) {
 }
 
 window.onload = function() {
-	var testPassword = 'jehova66';
 	var password, passHash, dec, enc, list = null;
-	var generateAES = false;
 	var request = new XMLHttpRequest();
+
+	document.getElementById('encryptionKey').focus();
+
+	/* filter shortcut: ctrl+q */
+	document.addEventListener('keydown', function(evt) {
+		//console.log(evt.keyCode);
+
+		if(evt.ctrlKey && evt.keyCode === 81) {
+			evt.preventDefault();
+			document.getElementById('filter').focus();
+		}
+	}, false);
 
 	function closeDialog() {
 		document.getElementById('overlay').className = 'hidden';
@@ -73,7 +96,7 @@ window.onload = function() {
 		document.getElementById('username').value = (index === -1) ? '' : list[index].username;
 		document.getElementById('pass').value = document.getElementById('passRepeat').value =
 		 (index === -1) ? '' : list[index].password;
-		document.getElementById('comment').innerHTML = (index === -1) ? '' : list[index].comment;
+		document.getElementById('comment').value = (index === -1) ? '' : list[index].comment;
 	}
 
 	document.getElementById('overlay').addEventListener('click', closeDialog);
@@ -212,7 +235,6 @@ window.onload = function() {
 		};
 
 		enc = GibberishAES.enc(JSON.stringify(list), password);
-		document.getElementById('testing').innerHTML = enc;
 		var params = 'pwhash=' + passHash + '&newlib=' + encodeURIComponent(enc);
 
 		request.open('POST', 'libupdate.php', true);
@@ -220,20 +242,13 @@ window.onload = function() {
 		request.send(params);
 	}
 
-	if(generateAES) {
-		var passwordList = createPasswordList(10);
-		enc = GibberishAES.enc(JSON.stringify(passwordList), testPassword);
-		document.getElementById('testing').innerHTML = enc;
-	}
-
 	request.onreadystatechange = function() {
-		if(this.readyState === 4 && this.status === 200 && !generateAES) {
-			document.getElementById('testing').innerHTML = this.responseText;
+		if(this.readyState === 4 && this.status === 200) {
 			enc = this.responseText;
 		}
 	};
 
-	request.open('GET', 'passwords.txt', true);
+	request.open('GET', 'passwords.txt?noCache=' + Math.floor(Math.random() * 1e6), true);
 	request.send(null);
 
 	document.getElementById('decrypt').addEventListener('submit', function(evt) {
@@ -242,14 +257,14 @@ window.onload = function() {
 
 		try {
 			dec = GibberishAES.dec(enc, password);
-			document.getElementById('testing').innerHTML = dec;
 			list = JSON.parse(dec);
 			displayList(list);
 			document.getElementById('authorized').className = '';
 			document.getElementById('unauthorized').className = 'hidden';
+			document.getElementById('filter').focus();
 		}
 		catch(e) {
-			document.getElementById('testing').innerHTML = 'decryption failed: ' + e;
+			alert('Decryption failed: ' + e);
 		}
 
 		evt.preventDefault();

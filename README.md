@@ -27,5 +27,5 @@ WAT IS COMING IN DA FUTURE
 ==========================
 - password/ username length hiding
 - space hiding in pass/ user
-- copy to clipboard (using flash :-()
+- copy to clipboard (using flash :-() OR just select whole password/ username upon click
 - read from keepass2 database file (maybe write, if possible)

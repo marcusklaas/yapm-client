@@ -58,6 +58,15 @@ function addObscuredCell(row, text) {
 	row.appendChild(node);
 }
 
+function addLinkCell(row, url) {
+	var node = document.createElement('td');
+	var anchor = document.createElement('a');
+	anchor.href = anchor.innerHTML = url;
+	anchor.target = '_blank';
+	node.appendChild(anchor);
+	row.appendChild(node);
+}
+
 function addCell(row, text) {
 	var node = document.createElement('td');
 	node.innerHTML = text;
@@ -66,19 +75,49 @@ function addCell(row, text) {
 
 window.onload = function() {
 	var password, passHash, dec, enc, list = null;
+	var idleTime = 0;
+	var maxIdleTime = 20;
 	var request = new XMLHttpRequest();
 
 	document.getElementById('encryptionKey').focus();
 
+	function logout() {
+		password = null;
+		passHash = null;
+		dec = null;
+		list = null;
+		document.getElementById('overview').lastChild.innerHTML = '';
+		document.getElementById('encryptionKey').focus();
+		document.getElementById('encryptionKey').value = '';
+		document.getElementById('authorized').className = 'hidden';
+		document.getElementById('unauthorized').className = '';
+	}
+
+	function resetIdleTime() {
+		idleTime = 0;
+	}
+
+	function incrementIdleTime() {
+		if(++idleTime > maxIdleTime)
+			logout();
+	}
+
+	setInterval(incrementIdleTime, 1000);
+
 	/* filter shortcut: ctrl+q */
 	document.addEventListener('keydown', function(evt) {
-		//console.log(evt.keyCode);
+		resetIdleTime();
 
 		if(evt.ctrlKey && evt.keyCode === 81) {
 			evt.preventDefault();
 			document.getElementById('filter').focus();
 		}
 	}, false);
+
+	window.onmousemove = resetIdleTime();
+	document.addEventListener("touchstart", resetIdleTime, false);
+	document.addEventListener("touchmove", resetIdleTime, false);
+	document.addEventListener("touchend", resetIdleTime, false);
 
 	function closeDialog() {
 		document.getElementById('overlay').className = 'hidden';
@@ -207,7 +246,7 @@ window.onload = function() {
 	function addRow(tbody, pass) {
 		var row = document.createElement('tr');
 		addCell(row, pass.title);
-		addCell(row, pass.url);
+		addLinkCell(row, pass.url);
 		addObscuredCell(row, pass.username);
 		addObscuredCell(row, pass.password);
 		addCell(row, pass.comment);

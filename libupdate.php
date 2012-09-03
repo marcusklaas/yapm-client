@@ -8,10 +8,9 @@ if(isset($_POST['pwhash']) && isset($_POST['newlib'])) {
 	if(sha1($_POST['pwhash']) !== $doubleHash)
 		die('incorrect password');
 
-	$i = 1;
-	$sfsg = true;
-
 	if(file_exists($pwlib.'.'.$pwlibext)) {
+		$i = 1;
+		
 		for(; file_exists($pwlib.$i.'.'.$pwlibext); $i++);
 
 		if(!rename($pwlib.'.'.$pwlibext, $pwlib.$i.'.'.$pwlibext))

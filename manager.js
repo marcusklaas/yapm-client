@@ -91,6 +91,9 @@ window.onload = function() {
 		document.getElementById('encryptionKey').value = '';
 		document.getElementById('authorized').className = 'hidden';
 		document.getElementById('unauthorized').className = '';
+		document.getElementById('username').value = '';
+		document.getElementById('pass').value = '';
+		document.getElementById('passRepeat').value = '';
 	}
 
 	function resetIdleTime() {
@@ -114,7 +117,8 @@ window.onload = function() {
 		}
 	}, false);
 
-	window.onmousemove = resetIdleTime();
+	document.onmousemove = resetIdleTime;
+	//document.addEventListener("mousemove", resetIdleTime, false);
 	document.addEventListener("touchstart", resetIdleTime, false);
 	document.addEventListener("touchmove", resetIdleTime, false);
 	document.addEventListener("touchend", resetIdleTime, false);

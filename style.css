@@ -3,8 +3,27 @@
 	src: url('font/password.ttf') format('truetype');  
 }
 
+#unauthorized {
+	text-align: center;
+}
+
+#authorized {
+	position: relative;
+}
+
+#lastModified {
+	display: block;
+	position: absolute;
+	top: 4px;
+	right: 0;
+}
+
+h1 {
+	padding-bottom: 1.8em;
+}
+
 #decrypt {
-	display: inline-block;
+	display: inline;
 }
 
 body {

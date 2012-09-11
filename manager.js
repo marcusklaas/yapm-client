@@ -75,9 +75,38 @@ function addCell(row, text) {
 
 window.onload = function() {
 	var password, passHash, dec, enc, list = null;
-	var idleTime = 0;
+	var idleTime = 0, offlineMode = false;
 	var maxIdleTime = 20;
-	var request = new XMLHttpRequest();
+
+	(function fetchPasswords() {
+		if(offlineMode) {
+			enc = localStorage["enc"];
+			return;
+		}
+
+		var request = new XMLHttpRequest();
+	
+		request.onreadystatechange = function() {
+			if(this.readyState === 4) {
+				if(this.status === 200)
+					localStorage["enc"] = enc = this.responseText;
+				else {
+					offlineMode = true;
+					enc = localStorage["enc"];
+				}
+			}
+		};
+
+		request.open('GET', 'encrypted/passwords.txt?noCache=' + Math.floor(Math.random() * 1e6), false);
+		
+		try {
+			request.send(null);
+		}
+		catch(e) {
+			offlineMode = true;
+			enc = localStorage["enc"];
+		}
+	})();
 
 	document.getElementById('encryptionKey').focus();
 
@@ -107,18 +136,17 @@ window.onload = function() {
 
 	setInterval(incrementIdleTime, 1000);
 
-	/* filter shortcut: ctrl+q */
+	/* filter shortcut: ctrl+e */
 	document.addEventListener('keydown', function(evt) {
 		resetIdleTime();
 
-		if(evt.ctrlKey && evt.keyCode === 81) {
+		if(evt.ctrlKey && evt.keyCode === 69) {
 			evt.preventDefault();
 			document.getElementById('filter').focus();
 		}
 	}, false);
 
 	document.onmousemove = resetIdleTime;
-	//document.addEventListener("mousemove", resetIdleTime, false);
 	document.addEventListener("touchstart", resetIdleTime, false);
 	document.addEventListener("touchmove", resetIdleTime, false);
 	document.addEventListener("touchend", resetIdleTime, false);
@@ -230,19 +258,21 @@ window.onload = function() {
 		link.addEventListener('click', toggleVisibility);
 		node.appendChild(link);
 
-		link = document.createElement('a');
-		link.href = '#';
-		link.className = 'editPassword';
-		link.innerHTML = '<i class="icon-edit"></i>';
-		link.addEventListener('click', editPassword);
-		node.appendChild(link);
+		if(false === offlineMode) {
+			link = document.createElement('a');
+			link.href = '#';
+			link.className = 'editPassword';
+			link.innerHTML = '<i class="icon-edit"></i>';
+			link.addEventListener('click', editPassword);
+			node.appendChild(link);
 
-		link = document.createElement('a');
-		link.href = '#';
-		link.className = 'deletePassword';
-		link.innerHTML = '<i class="icon-trash"></i>';
-		link.addEventListener('click', deletePassword);
-		node.appendChild(link);
+			link = document.createElement('a');
+			link.href = '#';
+			link.className = 'deletePassword';
+			link.innerHTML = '<i class="icon-trash"></i>';
+			link.addEventListener('click', deletePassword);
+			node.appendChild(link);
+		}
 
 		row.appendChild(node);
 	}
@@ -277,7 +307,8 @@ window.onload = function() {
 			}
 		};
 
-		enc = GibberishAES.enc(JSON.stringify(list), password);
+		dec = {'modified': Math.round(new Date().getTime() / 1000), 'list': list};
+		localStorage["enc"] = enc = GibberishAES.enc(JSON.stringify(dec), password);
 		var params = 'pwhash=' + passHash + '&newlib=' + encodeURIComponent(enc);
 
 		request.open('POST', 'libupdate.php', true);
@@ -285,32 +316,29 @@ window.onload = function() {
 		request.send(params);
 	}
 
-	request.onreadystatechange = function() {
-		if(this.readyState === 4 && this.status === 200) {
-			enc = this.responseText;
-		}
-	};
-
-	request.open('GET', 'passwords.txt?noCache=' + Math.floor(Math.random() * 1e6), true);
-	request.send(null);
-
 	document.getElementById('decrypt').addEventListener('submit', function(evt) {
 		password = document.getElementById('encryptionKey').value;
 		passHash = SHA1(password);
+		evt.preventDefault();
 
 		try {
 			dec = GibberishAES.dec(enc, password);
-			list = JSON.parse(dec);
-			displayList(list);
-			document.getElementById('authorized').className = '';
-			document.getElementById('unauthorized').className = 'hidden';
-			document.getElementById('filter').focus();
 		}
 		catch(e) {
 			alert('Decryption failed: ' + e);
 		}
 
-		evt.preventDefault();
+		dec = JSON.parse(dec);
+		list = dec.list;
+		displayList(list);
+
+		var date = new Date(dec.modified * 1000);
+		var monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+		document.getElementById('modifiedDate').innerHTML = date.getDate() + ' ' + monthNames[date.getMonth()] + ' ' + date.getFullYear();
+		document.getElementById('authorized').className = '';
+		document.getElementById('unauthorized').className = 'hidden';
+		document.getElementById('filter').focus();
 	});
 
 	document.getElementById('randPass').addEventListener('click', function(evt) {
@@ -320,20 +348,33 @@ window.onload = function() {
 		evt.preventDefault();
 	});
 
-	document.getElementById('newPassword').addEventListener('click', function(evt) {
-		evt.preventDefault();
-		editDialog(-1);
-	});
+	if(offlineMode) {
+		var button = document.getElementById('newPassword');
+		button.parentNode.removeChild(button);
+	}
+	else {
+		document.getElementById('newPassword').addEventListener('click', function(evt) {
+			evt.preventDefault();
+			editDialog(-1);
+		});
+	}
 
 	function filterPasswords(val) {
 		var row = document.getElementById('overview').lastChild.firstChild;
 		val = val.toLowerCase();
+		var tokens = val.split(' ');
 
-		for(var i = 0; i < list.length; i++, row = row.nextSibling)
-			if(-1 === list[i].title.toLowerCase().indexOf(val))
-				row.classList.add('hidden');
-			else
+		for(var i = 0; i < list.length; i++, row = row.nextSibling) {
+			for(var j = 0; j < tokens.length; j++) {
+				if(-1 === list[i].title.toLowerCase().indexOf(tokens[j])
+				 && -1 === list[i].comment.toLowerCase().indexOf(tokens[j])) {
+					row.classList.add('hidden');
+					break;
+				}
+
 				row.classList.remove('hidden');
+			}			
+		}
 	}
 
 	document.getElementById('filter').addEventListener('keyup', function(evt) {

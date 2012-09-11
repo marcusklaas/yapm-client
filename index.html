@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" manifest="cache.manifest">
 
 <head>
 <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
@@ -15,10 +15,13 @@
 
 <body>
 
-<textarea id="testing"></textarea>
-
 <section id="unauthorized">
-	<h1>Yet Another Online Password Manager</h1>
+	<a href="https://github.com/marcusklaas/yet-another-password-manager">
+		<img style="position: absolute; top: 0; right: 0; border: 0;" src="forkme.png" alt="Fork me on GitHub">
+	</a>
+
+	<h1>Yet Another Online Password Manager</h1> 
+
 	<form id="decrypt" class="well form-inline" autocomplete="off">
 		<input type="password" id="encryptionKey" placeholder="master-key">
 		<button href="#" class="btn"><i class="icon-key"></i> Decrypt</button>
@@ -29,6 +32,8 @@
 	<form class="form-search">
 		<input type="text" id="filter" placeholder="filter" class="search-query">
 	</form>
+
+	<span id="lastModified">This list was last modified on <span id="modifiedDate">6 september 2012</span>.</span>
 
 	<table class="table table-striped" id="overview">
 		<thead>

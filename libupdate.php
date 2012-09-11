@@ -1,7 +1,7 @@
 <?php
 
 $doubleHash = '4ca45598c9a0c4c4366d33d6dfb89e77122d2f74';
-$pwlib = 'passwords';
+$pwlib = 'encrypted/passwords';
 $pwlibext = 'txt';
 
 if(isset($_POST['pwhash']) && isset($_POST['newlib'])) {

@@ -1,0 +1,22 @@
+CACHE MANIFEST
+index.html
+style.css
+sha1.js
+manager.js
+favicon.png
+gibberish-aes.js
+font-awesome.css
+bootstrap.css
+font/FontAwesome.ttf
+font/fontawesome-webfont.svg
+font/fontawesome-webfont.ttf
+font/password.ttf
+forkme.png
+
+FALLBACK:
+
+NETWORK:
+libupdate.php
+encrypted/passwords.txt
+
+CACHE:

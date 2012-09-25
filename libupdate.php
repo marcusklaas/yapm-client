@@ -1,8 +1,22 @@
 <?php
 
-$doubleHash = '4ca45598c9a0c4c4366d33d6dfb89e77122d2f74';
+$hashfile = 'passhash.txt';
+$doubleHash = trim(file_get_contents($hashfile));
 $pwlib = 'encrypted/passwords';
 $pwlibext = 'txt';
+
+if(false === $doubleHash)
+	die('failed reading hash file');
+
+if(isset($_POST['pwhash']) && isset($_POST['newhash'])) {
+	if(sha1($_POST['pwhash']) !== $doubleHash)
+		die('incorrect password');
+
+	if(!file_put_contents($hashfile, sha1($_POST['newhash'])))
+		die('failed writing new hash to file');
+
+	die('success');
+}
 
 if(isset($_POST['pwhash']) && isset($_POST['newlib'])) {
 	if(sha1($_POST['pwhash']) !== $doubleHash)
@@ -10,7 +24,7 @@ if(isset($_POST['pwhash']) && isset($_POST['newlib'])) {
 
 	if(file_exists($pwlib.'.'.$pwlibext)) {
 		$i = 1;
-		
+
 		for(; file_exists($pwlib.$i.'.'.$pwlibext); $i++);
 
 		if(!rename($pwlib.'.'.$pwlibext, $pwlib.$i.'.'.$pwlibext))

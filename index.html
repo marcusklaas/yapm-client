@@ -47,6 +47,8 @@
 
 	<button id="newPassword" class="btn"><i class="icon-plus"></i> New Password</button>
 
+	<button id="newMasterkey" class="btn"><i class="icon-wrench"></i> Change Master Key</button>
+
 	<div class="hidden" id="overlay"></div>
 
 	<div class="modal hidden" id="editModal">
@@ -54,7 +56,7 @@
 			<button type="button" class="close" id="modalClose1">×</button>
 			<h3 id="modalHeader">Edit Password</h3>
 		</div>
-		<form id="newPassword" class="modal-body form-horizontal" autocomplete="off">
+		<form id="newPasswordForm" class="modal-body form-horizontal" autocomplete="off">
 
 			<div class="control-group">
 				<label class="control-label" for="title">Title</label>
@@ -102,6 +104,33 @@
 		<div class="modal-footer">
 			<a href="#" class="btn" id="randPass"><i class="icon-random"></i> Random Password</a>
 			<a href="#" class="btn btn-primary" id="save"><i class="icon-save"></i> Save</a>
+		</div>
+	</div>
+
+	<div class="modal hidden" id="masterkeyModal">
+		<div class="modal-header">
+			<button type="button" class="close" id="modalClose2">×</button>
+			<h3 id="modalHeader">Edit Master Key</h3>
+		</div>
+		<form id="newMasterkeyForm" class="modal-body form-horizontal" autocomplete="off">
+
+			<div class="control-group">
+				<label class="control-label" for="pass">New Master Key</label>
+				<div class="controls">
+					<input type="password" id="key" placeholder="">
+				</div>
+			</div>
+
+			<div class="control-group">
+				<label class="control-label" for="passRepeat">Master Key Repeat</label>
+				<div class="controls">
+					<input type="password" id="keyRepeat" placeholder="">
+				</div>
+			</div>
+
+		</form>
+		<div class="modal-footer">
+			<a href="#" class="btn btn-primary" id="saveKey"><i class="icon-warning-sign"></i> Save</a>
 		</div>
 	</div>
 </section>

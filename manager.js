@@ -154,6 +154,7 @@ window.onload = function() {
 	function closeDialog() {
 		document.getElementById('overlay').className = 'hidden';
 		document.getElementById('editModal').classList.add('hidden');
+		document.getElementById('masterkeyModal').classList.add('hidden');
 	}
 
 	/* index -1 means new */
@@ -172,6 +173,7 @@ window.onload = function() {
 
 	document.getElementById('overlay').addEventListener('click', closeDialog);
 	document.getElementById('modalClose1').addEventListener('click', closeDialog);
+	document.getElementById('modalClose2').addEventListener('click', closeDialog);
 
 	document.getElementById('save').addEventListener('click', function(evt) {
 		evt.preventDefault();
@@ -211,7 +213,7 @@ window.onload = function() {
 			node.nextSibling.innerHTML = pwdEntry.comment;
 		}
 	
-		sendUpdate(list);
+		sendUpdate();
 		closeDialog();
 	});
 
@@ -228,7 +230,6 @@ window.onload = function() {
 		list.splice(i, 1);
 		row.parentNode.removeChild(row);
 		sendUpdate();
-		
 	}
 
 	function toggleVisibility(evt) {
@@ -348,14 +349,62 @@ window.onload = function() {
 		evt.preventDefault();
 	});
 
+
 	if(offlineMode) {
 		var button = document.getElementById('newPassword');
+		button.parentNode.removeChild(button);
+		button = document.getElementById('newMasterkey');
 		button.parentNode.removeChild(button);
 	}
 	else {
 		document.getElementById('newPassword').addEventListener('click', function(evt) {
 			evt.preventDefault();
 			editDialog(-1);
+		});
+
+		document.getElementById('newMasterkey').addEventListener('click', function(evt) {
+			document.getElementById('overlay').className = '';
+			document.getElementById('masterkeyModal').classList.remove('hidden');
+		});
+
+		document.getElementById('saveKey').addEventListener('click', function(evt) {
+			evt.preventDefault();
+
+			if(true !== confirm('Are you sure you want to change the master key?')) {
+				closeDialog();
+				return;
+			}
+
+			var newKey = document.getElementById('key').value;
+			var newKeyRepeat = document.getElementById('keyRepeat').value;
+
+			if(newKey !== newKeyRepeat) {
+				alert('New keys do not match!');
+				return;
+			}
+
+			/* send new passHash to server */
+			var request = new XMLHttpRequest();
+
+			request.onreadystatechange = function() {
+				if(this.readyState === 4 && this.status === 200) {
+					if(this.responseText !== 'success') {
+						alert('key change failed ' + this.responseText);
+					}
+					else {
+						password = newKey;
+						passHash = SHA1(password);
+						sendUpdate();
+						closeDialog();
+					}
+				}
+			};
+
+			var params = 'pwhash=' + passHash + '&newhash=' + SHA1(newKey);
+
+			request.open('POST', 'libupdate.php', false);
+			request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+			request.send(params);
 		});
 	}
 

@@ -408,21 +408,36 @@ window.onload = function() {
 		});
 	}
 
+	/* this function looks fairly complex -- try to make it simpler when ur
+	 * not as tired */
 	function filterPasswords(val) {
-		var row = document.getElementById('overview').lastChild.firstChild;
+		var tableBody = document.getElementById('overview').lastChild;
+		var row = tableBody.firstChild, nextRow;
+		var len = list.length;
 		val = val.toLowerCase();
 		var tokens = val.split(' ');
 
-		for(var i = 0; i < list.length; i++, row = row.nextSibling) {
+		for(var i = 0, k = 0; i < len; i++, row = nextRow) {
+			nextRow = row.nextSibling;
+
 			for(var j = 0; j < tokens.length; j++) {
-				if(-1 === list[i].title.toLowerCase().indexOf(tokens[j])
-				 && -1 === list[i].comment.toLowerCase().indexOf(tokens[j])) {
+				var tmp;
+
+				if(-1 === list[k].title.toLowerCase().indexOf(tokens[j])
+				 && -1 === list[k].comment.toLowerCase().indexOf(tokens[j])) {
 					row.classList.add('hidden');
+
+					/* place row at bottom of list */
+					tableBody.insertBefore(row, null);
+					tmp = list[k];
+					list.splice(k, 1);
+					list[len - 1] = tmp;
 					break;
 				}
 
 				row.classList.remove('hidden');
-			}			
+				k++;
+			}
 		}
 	}
 

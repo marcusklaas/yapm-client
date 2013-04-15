@@ -83,3 +83,9 @@ tr:not(.exposed) td .obscured {
 	font-family: password;
 	word-spacing: -.30em;
 }
+
+h2#testPhrase {
+	margin-top: 1em;
+	font-family: password;
+	word-spacing: -.30em;
+}

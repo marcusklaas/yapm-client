@@ -89,3 +89,7 @@ h2#testPhrase {
 	font-family: password;
 	word-spacing: -.30em;
 }
+
+form.form-search {
+	display: inline-block;
+}

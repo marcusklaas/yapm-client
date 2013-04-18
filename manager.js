@@ -351,21 +351,32 @@ window.onload = function() {
 
 
 	if(offlineMode) {
-		var button = document.getElementById('newPassword');
-		button.parentNode.removeChild(button);
-		button = document.getElementById('newMasterkey');
-		button.parentNode.removeChild(button);
+		var buttons = document.getElementsByClassName('newPassword');
+		for(var i = 0; i < buttons.length; i++)
+			buttons[i].parentNode.removeChild(button);
+
+		buttons = document.getElementsByClassName('newMasterKey');
+		for(var i = 0; i < buttons.length; i++)
+			buttons[i].parentNode.removeChild(button);
 	}
 	else {
-		document.getElementById('newPassword').addEventListener('click', function(evt) {
+		function newPW(evt) {
 			evt.preventDefault();
 			editDialog(-1);
-		});
+		}
 
-		document.getElementById('newMasterkey').addEventListener('click', function(evt) {
+		function newMasterPW(evt) {
 			document.getElementById('overlay').className = '';
 			document.getElementById('masterkeyModal').classList.remove('hidden');
-		});
+		}
+
+		var buttons = document.getElementsByClassName('newPassword');
+		for(var i = 0; i < buttons.length; i++)
+			buttons[i].addEventListener('click', newPW);
+
+		buttons = document.getElementsByClassName('newMasterKey');
+		for(var i = 0; i < buttons.length; i++)
+			buttons[i].addEventListener('click', newMasterPW);
 
 		document.getElementById('saveKey').addEventListener('click', function(evt) {
 			evt.preventDefault();

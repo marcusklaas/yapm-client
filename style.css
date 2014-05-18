@@ -28,7 +28,7 @@ html, body {
 
 #authorized {
 	position: relative;
-	padding: 2em;
+	padding: 0 0 2em 0;
 }
 
 #lastModified {
@@ -62,6 +62,14 @@ a:not(:last-child) {
 	left: 0;
 	background-color: rgba(0, 0, 0, 0.5);
 	z-index: 10;
+}
+
+.wide-container {
+	padding: 4em 7px 0 7px;
+}
+
+#navbar-collapse {
+	padding: 9px 9px 0 9px;
 }
 
 table {

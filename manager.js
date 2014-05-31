@@ -166,7 +166,7 @@ window.onload = function() {
 	document.addEventListener("touchend", resetIdleTime, false);
 
 	function closeDialog(event) {
-		if(event.target != this) {
+		if(event && event.target != this) {
 			return;
 		}
 
@@ -221,9 +221,8 @@ window.onload = function() {
 				node = node.nextSibling;
 
 			node = node.firstChild;
-			node.innerHTML = pwdEntry.title;
-			node = node.nextSibling;
-			node.innerHTML = pwdEntry.url;
+			node.firstChild.innerHTML = pwdEntry.title;
+			node.firstChild.href = pwdEntry.url;
 			node = node.nextSibling;
 			node.firstChild.innerHTML = pwdEntry.username;
 			node = node.nextSibling;

@@ -63,8 +63,9 @@ a:not(:last-child) {
 	display: none;
 }
 
-.navbar-collapse {
+.navbar {
 	padding-right: 15px !important;
+	margin-bottom: 0 !important;
 }
 
 .navbar-fixed-top {
@@ -83,7 +84,7 @@ a:not(:last-child) {
 }
 
 .wide-container {
-	padding: 50px 27px 0 27px;
+	padding: 53px 27px 0 27px;
 }
 
 table#overview td:last-child {

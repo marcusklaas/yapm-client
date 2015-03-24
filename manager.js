@@ -58,10 +58,11 @@ function addObscuredCell(row, text) {
 	row.appendChild(node);
 }
 
-function addLinkCell(row, url) {
+function addLinkCell(row, url, text) {
 	var node = document.createElement('td');
 	var anchor = document.createElement('a');
-	anchor.href = anchor.innerHTML = url;
+	anchor.href = url;
+	anchor.innerHTML = text;
 	anchor.target = '_blank';
 	node.appendChild(anchor);
 	row.appendChild(node);
@@ -70,6 +71,19 @@ function addLinkCell(row, url) {
 function addCell(row, text) {
 	var node = document.createElement('td');
 	node.innerHTML = text;
+	row.appendChild(node);
+}
+
+function addComment(row, text) {
+	var node = document.createElement('td');
+	var table = document.createElement('table');
+	var tableRow = document.createElement('tr');
+	var cell = document.createElement('td');
+	table.className = 'comment';
+	cell.innerHTML = text;
+	tableRow.appendChild(cell);
+	table.appendChild(tableRow);
+	node.appendChild(table);
 	row.appendChild(node);
 }
 
@@ -151,15 +165,17 @@ window.onload = function() {
 	document.addEventListener("touchmove", resetIdleTime, false);
 	document.addEventListener("touchend", resetIdleTime, false);
 
-	function closeDialog() {
-		document.getElementById('overlay').className = 'hidden';
+	function closeDialog(event) {
+		if(event && event.target != this) {
+			return;
+		}
+
 		document.getElementById('editModal').classList.add('hidden');
 		document.getElementById('masterkeyModal').classList.add('hidden');
 	}
 
 	/* index -1 means new */
 	function editDialog(index) {
-		document.getElementById('overlay').className = '';
 		document.getElementById('editModal').classList.remove('hidden');
 		document.getElementById('editModal').setAttribute('data-index', index);
 		document.getElementById('modalHeader').innerHTML = (index === -1) ? 'New password' : 'Edit password';
@@ -171,7 +187,8 @@ window.onload = function() {
 		document.getElementById('comment').value = (index === -1) ? '' : list[index].comment;
 	}
 
-	document.getElementById('overlay').addEventListener('click', closeDialog);
+	document.getElementById('editModal').addEventListener('click', closeDialog);
+	document.getElementById('masterkeyModal').addEventListener('click', closeDialog);
 	document.getElementById('modalClose1').addEventListener('click', closeDialog);
 	document.getElementById('modalClose2').addEventListener('click', closeDialog);
 
@@ -194,6 +211,7 @@ window.onload = function() {
 		if(index === -1) {
 			list.push(pwdEntry);
 			addRow(document.getElementById('overview').lastChild, pwdEntry);
+			filterPasswords(document.getElementById('filter').value);
 		}
 		else {
 			list[index] = pwdEntry;
@@ -203,9 +221,8 @@ window.onload = function() {
 				node = node.nextSibling;
 
 			node = node.firstChild;
-			node.innerHTML = pwdEntry.title;
-			node = node.nextSibling;
-			node.innerHTML = pwdEntry.url;
+			node.firstChild.innerHTML = pwdEntry.title;
+			node.firstChild.href = pwdEntry.url;
 			node = node.nextSibling;
 			node.firstChild.innerHTML = pwdEntry.username;
 			node = node.nextSibling;
@@ -280,11 +297,10 @@ window.onload = function() {
 
 	function addRow(tbody, pass) {
 		var row = document.createElement('tr');
-		addCell(row, pass.title);
-		addLinkCell(row, pass.url);
+		addLinkCell(row, pass.url, pass.title);
 		addObscuredCell(row, pass.username);
 		addObscuredCell(row, pass.password);
-		addCell(row, pass.comment);
+		addComment(row, pass.comment);
 		addLinks(row);
 		tbody.appendChild(row);
 	}
@@ -336,7 +352,7 @@ window.onload = function() {
 		var date = new Date(dec.modified * 1000);
 		var monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
 
-		document.getElementById('modifiedDate').innerHTML = date.getDate() + ' ' + monthNames[date.getMonth()] + ' ' + date.getFullYear();
+		//document.getElementById('modifiedDate').innerHTML = date.getDate() + ' ' + monthNames[date.getMonth()] + ' ' + date.getFullYear();
 		document.getElementById('authorized').className = '';
 		document.getElementById('unauthorized').className = 'hidden';
 		document.getElementById('filter').focus();
@@ -366,7 +382,6 @@ window.onload = function() {
 		}
 
 		function newMasterPW(evt) {
-			document.getElementById('overlay').className = '';
 			document.getElementById('masterkeyModal').classList.remove('hidden');
 		}
 

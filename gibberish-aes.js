@@ -159,6 +159,15 @@ var GibberishAES = (function(){
         data00 = passwordArr.concat(saltArr),
         i;
         md5_hash[0] = GibberishAES.Hash.MD5(data00);
+
+
+        console.log('real data00');
+        console.log(data00);
+
+        console.log('real first hash');
+        console.log(md5_hash[0]);
+
+
         result = md5_hash[0];
         for (i = 1; i < rounds; i++) {
             md5_hash[i] = GibberishAES.Hash.MD5(md5_hash[i - 1].concat(data00));

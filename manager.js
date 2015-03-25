@@ -1,3 +1,41 @@
+crypto = window.crypto || window.msCrypto;
+
+function a2s(buffer) {
+    var str = '';
+
+    for (var iii = 0; iii < buffer.byteLength; iii++) {
+        str += String.fromCharCode(buffer[iii]);
+    }
+
+    return str;
+}
+
+function s2a(string) {
+    var array = [], i;
+
+    for (i = 0; i < string.length; i++) {
+        array[i] = string.charCodeAt(i);
+    }
+
+    return array;
+}
+
+function openSSLKey(passwordArr, saltArr) {
+    var data00 = passwordArr.concat(saltArr),
+        md5_hash = [md5(data00)],
+        result = md5_hash[0];
+
+    for (var i = 1; i < 3; i++) {
+        md5_hash[i] = md5(md5_hash[i - 1].concat(data00));
+        result = result.concat(md5_hash[i]);
+    }
+
+    return {
+        key: result.slice(0, 32),
+        iv: result.slice(32, 48)
+    };
+}
+
 function passwordEntry() {
 	this.title = 'unnamed';
 	this.url = 'https://marcusklaas.nl';
@@ -22,18 +60,6 @@ function randPass(len, alphabet) {
 	}
 
 	return result;
-}
-
-function createPasswordList(size) {
-	var i = 0;
-	var list = new Array(size);
-
-	while(i < size) {
-		list[i] = new passwordEntry;
-		list[i].title = 'password' + ++i;
-	}
-
-	return list;
 }
 
 function selectText() {
@@ -68,12 +94,6 @@ function addLinkCell(row, url, text) {
 	row.appendChild(node);
 }
 
-function addCell(row, text) {
-	var node = document.createElement('td');
-	node.innerHTML = text;
-	row.appendChild(node);
-}
-
 function addComment(row, text) {
 	var node = document.createElement('td');
 	var table = document.createElement('table');
@@ -87,10 +107,28 @@ function addComment(row, text) {
 	row.appendChild(node);
 }
 
+function deriveKey(password) {
+    var keyIvPair = openSSLKey(s2a(password), plainText.slice(8, 16));
+    var key = new Uint8Array(keyIvPair.key);
+    var iv = new Uint8Array(keyIvPair.iv);
+    var cryptoText = new Uint8Array(plainText.slice(16));
+
+    window.crypto.subtle.importKey("raw", key, {name: "AES-CBC"}, false, ["encrypt", "decrypt"])
+        .then(function (key) {
+            var pair = {
+                key: key,
+                iv: iv
+            };
+
+            return Promise.resolve(pair);
+        });
+}
+
 window.onload = function() {
 	var password, passHash, dec, enc, list = null;
 	var idleTime = 0, offlineMode = false;
 	var maxIdleTime = 20;
+    var cryptoKey, iv;
 
 	(function fetchPasswords() {
 		if(offlineMode) {
@@ -129,6 +167,9 @@ window.onload = function() {
 		passHash = null;
 		dec = null;
 		list = null;
+        cryptoKey = null;
+        iv = null;
+
 		document.getElementById('overview').lastChild.innerHTML = '';
 		document.getElementById('encryptionKey').focus();
 		document.getElementById('encryptionKey').value = '';
@@ -306,11 +347,9 @@ window.onload = function() {
 	}
 
 	function displayList(list) {
-		var i = 0;
-		var pwdEntry = null;
 		var tableBody = document.getElementById('overview').lastChild;
 
-		for(i = 0; i < list.length; i++)
+		for(var i = 0; i < list.length; i++)
 			addRow(tableBody, list[i]);
 	}
 
@@ -334,34 +373,42 @@ window.onload = function() {
 	}
 
 	document.getElementById('decrypt').addEventListener('submit', function(evt) {
-		password = document.getElementById('encryptionKey').value;
+        evt.preventDefault();
+
+        password = document.getElementById('encryptionKey').value;
 		passHash = SHA1(password);
-		evt.preventDefault();
 
-		try {
-			dec = GibberishAES.dec(enc, password);
-		}
-		catch(e) {
-			alert('Decryption failed: ' + e);
-		}
+        deriveKey(password)
+            .then(function (keyIvPair) {
+                cryptoKey = keyIvPair.key;
+                iv = new Uint8Array(keyIvPair.iv);
 
-		dec = JSON.parse(dec);
-		list = dec.list;
-		displayList(list);
+                var cipherText = s2a(atob(enc)); //
+                var cryptoText = new Uint8Array(cipherText.slice(16));
 
-		var date = new Date(dec.modified * 1000);
-		var monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+                return crypto.subtle.decrypt({name: "AES-CBC", iv: iv}, key, cryptoText);
 
-		//document.getElementById('modifiedDate').innerHTML = date.getDate() + ' ' + monthNames[date.getMonth()] + ' ' + date.getFullYear();
-		document.getElementById('authorized').className = '';
-		document.getElementById('unauthorized').className = 'hidden';
-		document.getElementById('filter').focus();
+            })
+            .then(function(result) {
+                var decrypted_data = new Uint8Array(result);
+
+                dec = JSON.parse(a2s(decrypted_data));
+                list = dec.list;
+                displayList(list);
+
+                document.getElementById('authorized').className = '';
+                document.getElementById('unauthorized').className = 'hidden';
+                document.getElementById('filter').focus();
+            })
+            .catch(function (e) {
+                alert('Decryption failed: ' + e.message);
+            });
 	});
 
 	document.getElementById('randPass').addEventListener('click', function(evt) {
 		document.getElementById('pass').value =
 		 document.getElementById('passRepeat').value =
-		 randPass(12, false);
+		 randPass(16, false);
 		evt.preventDefault();
 	});
 

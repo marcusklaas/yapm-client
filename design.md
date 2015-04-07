@@ -50,6 +50,7 @@ A password object looks like this:
 
     {
         title: String,
+        username: String,
         password: String,
         url: String,
         comment: String

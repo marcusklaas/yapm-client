@@ -17,8 +17,7 @@ var library = {
     blob: null
 };
 
-var password = "test123";
-var iterations = 4096;
+var password = "changeme";
 
 // Check that web crypto is even available
 if (!window.crypto || !window.crypto.subtle) {
@@ -99,10 +98,6 @@ var shaPromise =
     .then(function(uintArray) {
         return Promise.resolve(arrayBufferToHexString(uintArray));
     });
-
-shaPromise.then(function(hex) {
-    console.log('SHA1 hash: ' + hex);
-});
 
 // First, create a PBKDF2 "key" containing the password
 var cryptoKeyPromise =
@@ -239,3 +234,7 @@ var decryptionPromise =
         .catch(function (error) {
             console.log('Error: ' + error.message);
         });
+
+libraryPromise.then(function (lib) {
+    console.log(lib);
+});

@@ -1,4 +1,90 @@
+// FIXME: use crypto everywhere instead of window.crypto -- or are these equivalent to each other?
 crypto = window.crypto || window.msCrypto;
+downloadUrl = 'encrypted/passwords.txt?noCache=' + Math.floor(Math.random() * 1e6);
+maxIdleTime = 20; // seconds
+
+// encode num in little endian format
+function encodeIvFromNumber(num) {
+    // iv is 16 bytes long
+    let iv = new Uint8Array(16);
+
+    // support num up to 8 bytes long
+    for(let i = 0; i < 8; i++) {
+        iv[i] = num & 255;
+
+        num = num >>> 8;
+    }
+
+    return iv;
+}
+
+function stringToArrayBuffer(string) {
+    let encoder = new TextEncoder("utf-8");
+
+    return encoder.encode(string);
+}
+
+function arrayBufferToString(array) {
+    let decoder = new TextDecoder("utf-8");
+
+    return decoder.decode(array);
+}
+
+function bufferViewToArray(buffer) {
+    let array = new Uint8Array(buffer);
+    let list = [];
+
+    for(let i = 0; i < array.length; i++) {
+        list[i] = array[i];
+    }
+
+    return list;
+}
+
+function bufferViewToBase64(buffer) {
+    let list = bufferViewToArray(buffer);
+
+    return btoa(list);
+}
+
+function arrayBufferToHexString(arrayBuffer) {
+    let byteArray = new Uint8Array(arrayBuffer);
+    let hexString = "";
+    let nextHexByte;
+
+    for (let i = 0; i < byteArray.byteLength; i++) {
+        nextHexByte = byteArray[i].toString(16);
+        if (nextHexByte.length < 2) {
+            nextHexByte = "0" + nextHexByte;
+        }
+        hexString += nextHexByte;
+    }
+
+    return hexString;
+}
+
+function getAsync(url) {
+    // Return a new promise.
+    return new Promise(function(resolve, reject) {
+        let req = new XMLHttpRequest();
+        req.open('GET', url);
+
+        req.onload = function() {
+            if (req.status == 200) {
+                resolve(req.response);
+            }
+            else {
+                reject(Error(req.statusText));
+            }
+        };
+
+        req.onerror = function() {
+            reject(Error("Network Error"));
+        };
+
+        req.send();
+    });
+}
 
 function passwordEntry() {
 	this.title = 'unnamed';
@@ -9,14 +95,14 @@ function passwordEntry() {
 }
 
 function randPass(len, alphabet) {
-	var result = '';
+	let result = '';
 
 	if (!alphabet) {
         alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
         + '.,?:;[]~!@#$%^&*()-+/';
     }
 
-	var alphabetLength = alphabet.length;
+	let alphabetLength = alphabet.length;
 
 	if ((len === undefined) || isNaN(len) || len < 6) {
         len = 12;
@@ -32,19 +118,19 @@ function randPass(len, alphabet) {
 
 function selectText() {
 	if (document.selection) {
-		var range = document.body.createTextRange();
+		let range = document.body.createTextRange();
 		range.moveToElementText(this);
 		range.select();
 	} else if (window.getSelection) {
-		var range = document.createRange();
+		let range = document.createRange();
 		range.selectNode(this);
 		window.getSelection().addRange(range);
 	}
 }
 
 function addObscuredCell(row, text) {
-	var node = document.createElement('td');
-	var span = document.createElement('div');
+	let node = document.createElement('td');
+	let span = document.createElement('div');
 	span.className = 'obscured';
 	span.innerHTML = text;
 	span.addEventListener('click', selectText);
@@ -53,8 +139,8 @@ function addObscuredCell(row, text) {
 }
 
 function addLinkCell(row, url, text) {
-	var node = document.createElement('td');
-	var anchor = document.createElement('a');
+	let node = document.createElement('td');
+	let anchor = document.createElement('a');
 	anchor.href = url;
 	anchor.innerHTML = text;
 	anchor.target = '_blank';
@@ -63,10 +149,10 @@ function addLinkCell(row, url, text) {
 }
 
 function addComment(row, text) {
-	var node = document.createElement('td');
-	var table = document.createElement('table');
-	var tableRow = document.createElement('tr');
-	var cell = document.createElement('td');
+	let node = document.createElement('td');
+	let table = document.createElement('table');
+	let tableRow = document.createElement('tr');
+	let cell = document.createElement('td');
 	table.className = 'comment';
 	cell.innerHTML = text;
 	tableRow.appendChild(cell);
@@ -75,385 +161,540 @@ function addComment(row, text) {
 	row.appendChild(node);
 }
 
+/**
+ * @param password string
+ * @returns Promise
+ */
+function getSha1(password) {
+    return window.crypto.subtle.digest(
+        {
+            name: "SHA-1"
+        },
+        stringToArrayBuffer(password)
+    )
+    .then(function(uintArray) {
+        return Promise.resolve(arrayBufferToHexString(uintArray));
+    });
+}
+
+/**
+ * @param password string
+ * @param version  int
+ * @returns Promise
+ */
+function getAesKey(password, version) {
+    return window.crypto.subtle.importKey(
+        "raw",
+        stringToArrayBuffer(password),
+        {
+            "name": "PBKDF2"
+        },
+        false,
+        ["deriveKey"]
+    )
+    .then(function (baseKey) {
+        return window.crypto.subtle.deriveKey(
+            {
+                "name": "PBKDF2",
+                "salt": encodeIvFromNumber(version),
+                "iterations": 4096,
+                "hash": {
+                    name: "SHA-1"
+                }
+            },
+            baseKey,
+            {
+                "name": "AES-CBC",
+                "length": 256
+            },
+            false,
+            ["encrypt", "decrypt"]
+        );
+    });
+}
+
+/**
+ * @param key     KeyObject
+ * @param obj     object
+ * @param version int
+ * @returns Promise
+ */
+function encryptObject(key, obj, version) {
+    return crypto.subtle.encrypt(
+        {
+            name: "AES-CBC",
+            iv: encodeIvFromNumber(version)
+        },
+        key,
+        stringToArrayBuffer(JSON.stringify(obj))
+    )
+    .then(function(result) {
+        let base64 = bufferViewToBase64(result);
+
+        return Promise.resolve(base64);
+    });
+}
+
+/**
+ * @param blob           string
+ * @param libraryVersion int
+ * @param apiVersion     int
+ * @returns object
+ */
+function createLibrary(blob, libraryVersion, apiVersion) {
+    return {
+        blob: JSON.stringify(blob),
+        library_version: libraryVersion,
+        api_version: apiVersion,
+        modified: 0 // TODO: seconds since epoch
+    };
+}
+
+/**
+ * @param password string
+ * @returns Promise
+ */
+function getHmacKey(password) {
+    return window.crypto.subtle.importKey(
+        "raw",
+        stringToArrayBuffer(password),
+        {
+            name: "HMAC",
+            hash: {
+                name: "SHA-256"
+            }
+        },
+        false,
+        ["sign", "verify"]
+    );
+}
+
+/**
+ * @param key HmacKey
+ * @param obj object
+ * @returns Promise containing string (base64 encoding)
+ */
+function getObjectHmac(key, obj) {
+    return window.crypto.subtle.sign(
+        {
+            name: "HMAC"
+        },
+        key,
+        stringToArrayBuffer(libText)
+    )
+    .then(function (signature) {
+        let sig = bufferViewToBase64(signature);
+
+        return Promise.resolve(sig);
+    });
+}
+
+/**
+ * @param key  HmacKey
+ * @param json string
+ * @param hmac string (base64 encoding)
+ * @returns Promise
+ */
+function verifyHmac(key, json, hmac) {
+    let decodedHmac = atob(hmac);
+
+    return window.crypto.subtle.verify(
+        {
+            name: "HMAC"
+        },
+        key,
+        stringToArrayBuffer(decodedHmac),
+        stringToArrayBuffer(json)
+    );
+}
+
+function decryptLibrary(key, library) {
+    let blob = library.blob;
+
+    let cryptoText = atob(blob);
+    let rawCryptoBytes = cryptoText.split(',').map(function (int) { return parseInt(int); }); // FIXME: this could probably be done more efficiently
+    let byteArray = new Uint8Array(rawCryptoBytes);
+
+    return crypto.subtle.decrypt(
+        {
+            name: "AES-CBC",
+            iv: encodeIvFromNumber(library.library_version)
+        },
+        key,
+        byteArray
+    )
+    .then(function (plainText) {
+        let obj = JSON.parse(arrayBufferToString(plainText));
+
+        return Promise.resolve(obj);
+    });
+}
+
+// TODO: rebuild offline mode
 window.onload = function() {
-	var password, passHash, dec, enc, list = null;
-	var idleTime = 0, offlineMode = false;
-	var maxIdleTime = 20;
-    var cryptoKey, iv;
+    // Check that web crypto is even available
+    if (!window.crypto || !window.crypto.subtle) {
+        alert("Your browser does not support the Web Cryptography API! This page will not work.");
+    }
 
-	(function fetchPasswords() {
-		if(offlineMode) {
-			enc = localStorage["enc"];
-			return;
-		}
+    if (!window.TextEncoder || !window.TextDecoder) {
+        alert("Your browser does not support the Encoding API! This page will not work.");
+    }
 
-		var request = new XMLHttpRequest();
-	
-		request.onreadystatechange = function() {
-			if(this.readyState === 4) {
-				if(this.status === 200)
-					localStorage["enc"] = enc = s2a(atob(this.responseText));
-				else {
-					offlineMode = true;
-					enc = localStorage["enc"];
-				}
-			}
-		};
+    let idleTime = 0;
 
-		request.open('GET', 'encrypted/passwords.txt?noCache=' + Math.floor(Math.random() * 1e6), false);
-		
-		try {
-			request.send(null);
-		}
-		catch(e) {
-			offlineMode = true;
-			enc = localStorage["enc"];
-		}
-	})();
+    let passwordListPromise = (function (url) {
+        let libraryPromise = getAsync(url)
+            .then(function (clearText) {
+                return Promise.resolve(JSON.parse(clearText));
+            });
 
-	document.getElementById('encryptionKey').focus();
+        let passwordPromise = new Promise(function (resolve, reject) {
+            document.getElementById('decrypt').addEventListener('submit', function (evt) {
+                evt.preventDefault();
 
-	function logout() {
-		password = null;
-		passHash = null;
-		dec = null;
-		list = null;
-        cryptoKey = null;
-        iv = null;
+                let password = document.getElementById('encryptionKey').value;
 
-		document.getElementById('overview').lastChild.innerHTML = '';
-		document.getElementById('encryptionKey').focus();
-		document.getElementById('encryptionKey').value = '';
-		document.getElementById('authorized').className = 'hidden';
-		document.getElementById('unauthorized').className = '';
-		document.getElementById('username').value = '';
-		document.getElementById('pass').value = '';
-		document.getElementById('passRepeat').value = '';
-	}
+                document.getElementById('encryptionKey').value = '';
 
-	function resetIdleTime() {
-		idleTime = 0;
-	}
+                resolve(password);
+            });
+        });
 
-	function incrementIdleTime() {
-		if(++idleTime > maxIdleTime)
-			logout();
-	}
+        let aesKeyPromise = Promise
+            .all([passwordPromise, libraryPromise])
+            .then(function (params) {
+                let [password, library] = params;
 
-	setInterval(incrementIdleTime, 1000);
+                return getAesKey(password, library.library_version);
+            });
 
-	/* filter shortcut: ctrl+e */
-	document.addEventListener('keydown', function(evt) {
-		resetIdleTime();
+        return Promise
+            .all([aesKeyPromise, libraryPromise])
+            .then(function (params) {
+                let [key, library] = params;
 
-		if(evt.ctrlKey && evt.keyCode === 69) {
-			evt.preventDefault();
-			document.getElementById('filter').focus();
-		}
-	}, false);
+                return decryptLibrary(key, library);
+            });
+    })(downloadUrl);
 
-	document.onmousemove = resetIdleTime;
-	document.addEventListener("touchstart", resetIdleTime, false);
-	document.addEventListener("touchmove", resetIdleTime, false);
-	document.addEventListener("touchend", resetIdleTime, false);
+    passwordListPromise
+        .then(function (passwordList) {
+            displayList(passwordList);
 
-	function closeDialog(event) {
-		if(event && event.target != this) {
-			return;
-		}
+            document.getElementById('authorized').className = '';
+            document.getElementById('unauthorized').className = 'hidden';
+            document.getElementById('filter').focus();
+        })
+        .catch(function (error) {
+            alert('Something went wrong: ' + error.message);
+        });
 
-		document.getElementById('editModal').classList.add('hidden');
-		document.getElementById('masterkeyModal').classList.add('hidden');
-	}
+    document.getElementById('encryptionKey').focus();
 
-	/* index -1 means new */
-	function editDialog(index) {
-		document.getElementById('editModal').classList.remove('hidden');
-		document.getElementById('editModal').setAttribute('data-index', index);
-		document.getElementById('modalHeader').innerHTML = (index === -1) ? 'New password' : 'Edit password';
-		document.getElementById('title').value = (index === -1) ? '' : list[index].title;
-		document.getElementById('URL').value = (index === -1) ? '' : list[index].url;
-		document.getElementById('username').value = (index === -1) ? '' : list[index].username;
-		document.getElementById('pass').value = document.getElementById('passRepeat').value =
-		 (index === -1) ? '' : list[index].password;
-		document.getElementById('comment').value = (index === -1) ? '' : list[index].comment;
-	}
+    function resetIdleTime() {
+        idleTime = 0;
+    }
 
-	document.getElementById('editModal').addEventListener('click', closeDialog);
-	document.getElementById('masterkeyModal').addEventListener('click', closeDialog);
-	document.getElementById('modalClose1').addEventListener('click', closeDialog);
-	document.getElementById('modalClose2').addEventListener('click', closeDialog);
+    // TODO: we can use racing promises for this!! That'd be totally rad, yo!
+    function incrementIdleTime() {
+        if (++idleTime > maxIdleTime) {
+            logout();
+        }
+    }
 
-	document.getElementById('save').addEventListener('click', function(evt) {
-		evt.preventDefault();
+    setInterval(incrementIdleTime, 1000);
 
-		var index = parseInt(document.getElementById('editModal').getAttribute('data-index'));
-		var pwdEntry = new passwordEntry;
-		pwdEntry.title = document.getElementById('title').value;
-		pwdEntry.url = document.getElementById('URL').value;
-		pwdEntry.username = document.getElementById('username').value;
-		pwdEntry.password = document.getElementById('pass').value;
-		pwdEntry.comment = document.getElementById('comment').value;
+    /* filter shortcut: ctrl+e */
+    document.addEventListener('keydown', function (evt) {
+        resetIdleTime();
 
-		if(pwdEntry.password !== document.getElementById('passRepeat').value) {
-			alert('Passwords do not match!');
-			return;
-		}
+        if (evt.ctrlKey && evt.keyCode === 69) {
+            evt.preventDefault();
+            document.getElementById('filter').focus();
+        }
+    }, false);
 
-		if(index === -1) {
-			list.push(pwdEntry);
-			addRow(document.getElementById('overview').lastChild, pwdEntry);
-			filterPasswords(document.getElementById('filter').value);
-		}
-		else {
-			list[index] = pwdEntry;
-			
-			var node = document.getElementById('overview').lastChild.firstChild;
-			while(index--)
-				node = node.nextSibling;
+    document.onmousemove = resetIdleTime;
+    document.addEventListener("touchstart", resetIdleTime, false);
+    document.addEventListener("touchmove", resetIdleTime, false);
+    document.addEventListener("touchend", resetIdleTime, false);
 
-			node = node.firstChild;
-			node.firstChild.innerHTML = pwdEntry.title;
-			node.firstChild.href = pwdEntry.url;
-			node = node.nextSibling;
-			node.firstChild.innerHTML = pwdEntry.username;
-			node = node.nextSibling;
-			node.firstChild.innerHTML = pwdEntry.password;
-			node.nextSibling.innerHTML = pwdEntry.comment;
-		}
-	
-		sendUpdate();
-		closeDialog();
-	});
+    function closeDialog(event) {
+        if (event && event.target != this) {
+            return;
+        }
 
-	function deletePassword(evt) {
-		evt.preventDefault();
+        document.getElementById('editModal').classList.add('hidden');
+        document.getElementById('masterkeyModal').classList.add('hidden');
+    }
 
-		if(!confirm("Are you totally sure you want to delete this password?"))
-			return;
+    /* index -1 means new */
+    function editDialog(index) {
+        document.getElementById('editModal').classList.remove('hidden');
+        document.getElementById('editModal').setAttribute('data-index', index);
+        document.getElementById('modalHeader').innerHTML = (index === -1) ? 'New password' : 'Edit password';
+        document.getElementById('title').value = (index === -1) ? '' : list[index].title;
+        document.getElementById('URL').value = (index === -1) ? '' : list[index].url;
+        document.getElementById('username').value = (index === -1) ? '' : list[index].username;
+        document.getElementById('pass').value = document.getElementById('passRepeat').value =
+            (index === -1) ? '' : list[index].password;
+        document.getElementById('comment').value = (index === -1) ? '' : list[index].comment;
+    }
 
-		var i = 0, row = this.parentNode.parentNode;
+    document.getElementById('editModal').addEventListener('click', closeDialog);
+    document.getElementById('masterkeyModal').addEventListener('click', closeDialog);
+    document.getElementById('modalClose1').addEventListener('click', closeDialog);
+    document.getElementById('modalClose2').addEventListener('click', closeDialog);
 
-		for(child = row; (child = child.previousSibling) != null; i++);
-
-		list.splice(i, 1);
-		row.parentNode.removeChild(row);
-		sendUpdate();
-	}
-
-	function toggleVisibility(evt) {
-		var row = this.parentNode.parentNode;
-		var currentVisibility = row.className == 'exposed';
-
-		row.className = currentVisibility ? '' : 'exposed';
-		this.innerHTML = currentVisibility ? '<i class="icon-eye-open"></i>' : '<i class="icon-eye-close"></i>';
-		evt.preventDefault();
-	}
-
-	function editPassword(evt) {
-		var row = this.parentNode.parentNode;
-		var i = 0;
-
-		for(child = row; (child = child.previousSibling) !== null; i++);
-
-		editDialog(i);
-	}
-
-	function addLinks(row) {
-		var node = document.createElement('td');
-		var link = document.createElement('a');
-		link.href = '#';
-		link.className = 'toggleVisibility';
-		link.innerHTML = '<i class="icon-eye-open"></i>';
-		link.addEventListener('click', toggleVisibility);
-		node.appendChild(link);
-
-		if(false === offlineMode) {
-			link = document.createElement('a');
-			link.href = '#';
-			link.className = 'editPassword';
-			link.innerHTML = '<i class="icon-edit"></i>';
-			link.addEventListener('click', editPassword);
-			node.appendChild(link);
-
-			link = document.createElement('a');
-			link.href = '#';
-			link.className = 'deletePassword';
-			link.innerHTML = '<i class="icon-trash"></i>';
-			link.addEventListener('click', deletePassword);
-			node.appendChild(link);
-		}
-
-		row.appendChild(node);
-	}
-
-	function addRow(tbody, pass) {
-		var row = document.createElement('tr');
-		addLinkCell(row, pass.url, pass.title);
-		addObscuredCell(row, pass.username);
-		addObscuredCell(row, pass.password);
-		addComment(row, pass.comment);
-		addLinks(row);
-		tbody.appendChild(row);
-	}
-
-	function displayList(list) {
-		var tableBody = document.getElementById('overview').lastChild;
-
-		for(var i = 0; i < list.length; i++)
-			addRow(tableBody, list[i]);
-	}
-
-	function sendUpdate() {
-		var request = new XMLHttpRequest();
-
-		request.onreadystatechange = function() {
-			if(this.readyState === 4 && this.status === 200) {
-				if(this.responseText !== 'success')
-					alert('lib update failed ' + this.responseText);
-			}
-		};
-
-		dec = {'modified': Math.round(new Date().getTime() / 1000), 'list': list};
-
-        var prepped = new Uint8Array(s2a(dec));
-
-        crypto.subtle.encrypt({name: "AES-CBC", iv: iv}, cryptoKey, prepped)
-            .then(function (data) {
-                // TODO: do some stuff
-
-                localStorage["enc"] = enc = GibberishAES.enc(JSON.stringify(dec), password);
-                var params = 'pwhash=' + passHash + '&newlib=' + encodeURIComponent(enc);
-
-                request.open('POST', 'libupdate.php', true);
-                request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-                request.send(params);
-            })
-
-
-	}
-
-	document.getElementById('decrypt').addEventListener('submit', function(evt) {
+    document.getElementById('save').addEventListener('click', function (evt) {
         evt.preventDefault();
 
-        password = document.getElementById('encryptionKey').value;
-		passHash = SHA1(password);
+        let index = parseInt(document.getElementById('editModal').getAttribute('data-index'));
+        let pwdEntry = new passwordEntry;
+        pwdEntry.title = document.getElementById('title').value;
+        pwdEntry.url = document.getElementById('URL').value;
+        pwdEntry.username = document.getElementById('username').value;
+        pwdEntry.password = document.getElementById('pass').value;
+        pwdEntry.comment = document.getElementById('comment').value;
 
-        deriveKey(enc, password)
-            .then(function (keyIvPair) {
-                cryptoKey = keyIvPair.key;
-                iv = new Uint8Array(keyIvPair.iv);
+        if (pwdEntry.password !== document.getElementById('passRepeat').value) {
+            alert('Passwords do not match!');
+            return;
+        }
 
-                var cryptoText = new Uint8Array(enc.slice(16));
+        if (index === -1) {
+            list.push(pwdEntry);
+            addRow(document.getElementById('overview').lastChild, pwdEntry);
 
-                return crypto.subtle.decrypt({name: "AES-CBC", iv: iv}, cryptoKey, cryptoText);
-            })
-            .then(function(result) {
-                var decrypted_data = new Uint8Array(result);
+            filterPasswords(document.getElementById('filter').value);
+        }
+        else {
+            list[index] = pwdEntry;
 
-                dec = JSON.parse(a2s(decrypted_data));
-                list = dec.list;
-                displayList(list);
+            let node = document.getElementById('overview').lastChild.firstChild;
+            while (index--) {
+                node = node.nextSibling;
+            }
 
-                document.getElementById('authorized').className = '';
-                document.getElementById('unauthorized').className = 'hidden';
-                document.getElementById('filter').focus();
-            })
-            .catch(function (e) {
-                alert('Decryption failed: ' + e.message);
-            });
-	});
+            node = node.firstChild;
+            node.firstChild.innerHTML = pwdEntry.title;
+            node.firstChild.href = pwdEntry.url;
+            node = node.nextSibling;
+            node.firstChild.innerHTML = pwdEntry.username;
+            node = node.nextSibling;
+            node.firstChild.innerHTML = pwdEntry.password;
+            node.nextSibling.innerHTML = pwdEntry.comment;
+        }
 
-	document.getElementById('randPass').addEventListener('click', function(evt) {
-		document.getElementById('pass').value =
-		 document.getElementById('passRepeat').value =
-		 randPass(16, false);
-		evt.preventDefault();
-	});
+        sendUpdate();
+        closeDialog();
+    });
+
+    function deletePassword(evt) {
+        evt.preventDefault();
+
+        if (!confirm("Are you totally sure you want to delete this password?"))
+            return;
+
+        let i = 0, row = this.parentNode.parentNode;
+
+        for (child = row; (child = child.previousSibling) != null; i++);
+
+        list.splice(i, 1);
+        row.parentNode.removeChild(row);
+        sendUpdate();
+    }
+
+    function toggleVisibility(evt) {
+        let row = this.parentNode.parentNode;
+        let currentVisibility = row.className == 'exposed';
+
+        row.className = currentVisibility ? '' : 'exposed';
+        this.innerHTML = currentVisibility ? '<i class="icon-eye-open"></i>' : '<i class="icon-eye-close"></i>';
+        evt.preventDefault();
+    }
+
+    function editPassword(evt) {
+        let row = this.parentNode.parentNode;
+        let i = 0;
+
+        for (child = row; (child = child.previousSibling) !== null; i++);
+
+        editDialog(i);
+    }
+
+    function addLinks(row) {
+        let node = document.createElement('td');
+        let link = document.createElement('a');
+        link.href = '#';
+        link.className = 'toggleVisibility';
+        link.innerHTML = '<i class="icon-eye-open"></i>';
+        link.addEventListener('click', toggleVisibility);
+        node.appendChild(link);
+
+        if (true /* false === offlineMode */) {
+            link = document.createElement('a');
+            link.href = '#';
+            link.className = 'editPassword';
+            link.innerHTML = '<i class="icon-edit"></i>';
+            link.addEventListener('click', editPassword);
+            node.appendChild(link);
+
+            link = document.createElement('a');
+            link.href = '#';
+            link.className = 'deletePassword';
+            link.innerHTML = '<i class="icon-trash"></i>';
+            link.addEventListener('click', deletePassword);
+            node.appendChild(link);
+        }
+
+        row.appendChild(node);
+    }
+
+    function addRow(tbody, pass) {
+        let row = document.createElement('tr');
+        addLinkCell(row, pass.url, pass.title);
+        addObscuredCell(row, pass.username);
+        addObscuredCell(row, pass.password);
+        addComment(row, pass.comment);
+        addLinks(row);
+        tbody.appendChild(row);
+    }
+
+    function displayList(list) {
+        let tableBody = document.getElementById('overview').lastChild;
+
+        for (let i = 0; i < list.length; i++) {
+            addRow(tableBody, list[i]);
+        }
+    }
+
+    function logout() {
+        passwordListPromise = null;
+
+        document.getElementById('overview').lastChild.innerHTML = '';
+        document.getElementById('encryptionKey').focus();
+        document.getElementById('encryptionKey').value = '';
+        document.getElementById('authorized').className = 'hidden';
+        document.getElementById('unauthorized').className = '';
+        document.getElementById('username').value = '';
+        document.getElementById('pass').value = '';
+        document.getElementById('passRepeat').value = '';
+    }
+
+    function sendUpdate() {
+        let request = new XMLHttpRequest();
+
+        request.onreadystatechange = function () {
+            if (this.readyState === 4 && this.status === 200) {
+                if (this.responseText !== 'success')
+                    alert('lib update failed ' + this.responseText);
+            }
+        };
+
+        dec = {'modified': Math.round(new Date().getTime() / 1000), 'list': list};
+
+        // TODO: moar stuff, of course
+    }
+
+    document.getElementById('randPass').addEventListener('click', function (evt) {
+        let newPassword = randPass();
+
+        document.getElementById('pass').value = newPassword;
+        document.getElementById('passRepeat').value = newPassword;
+
+        evt.preventDefault();
+    });
 
 
-	if(offlineMode) {
-		var buttons = document.getElementsByClassName('newPassword');
-		for(var i = 0; i < buttons.length; i++)
-			buttons[i].parentNode.removeChild(button);
+    if (false /* offline mode */) {
+        let buttons = document.getElementsByClassName('newPassword');
+        for (let i = 0; i < buttons.length; i++)
+            buttons[i].parentNode.removeChild(button);
 
-		buttons = document.getElementsByClassName('newMasterKey');
-		for(var i = 0; i < buttons.length; i++)
-			buttons[i].parentNode.removeChild(button);
-	}
-	else {
-		function newPW(evt) {
-			evt.preventDefault();
-			editDialog(-1);
-		}
+        buttons = document.getElementsByClassName('newMasterKey');
+        for (let i = 0; i < buttons.length; i++)
+            buttons[i].parentNode.removeChild(button);
+    }
+    else {
+        function newPW(evt) {
+            evt.preventDefault();
+            editDialog(-1);
+        }
 
-		function newMasterPW(evt) {
-			document.getElementById('masterkeyModal').classList.remove('hidden');
-		}
+        function newMasterPW(evt) {
+            document.getElementById('masterkeyModal').classList.remove('hidden');
+        }
 
-		var buttons = document.getElementsByClassName('newPassword');
-		for(var i = 0; i < buttons.length; i++)
-			buttons[i].addEventListener('click', newPW);
+        let buttons = document.getElementsByClassName('newPassword');
+        for (let i = 0; i < buttons.length; i++)
+            buttons[i].addEventListener('click', newPW);
 
-		buttons = document.getElementsByClassName('newMasterKey');
-		for(var i = 0; i < buttons.length; i++)
-			buttons[i].addEventListener('click', newMasterPW);
+        buttons = document.getElementsByClassName('newMasterKey');
+        for (let i = 0; i < buttons.length; i++)
+            buttons[i].addEventListener('click', newMasterPW);
 
-		document.getElementById('saveKey').addEventListener('click', function(evt) {
-			evt.preventDefault();
+        document.getElementById('saveKey').addEventListener('click', function (evt) {
+            evt.preventDefault();
 
-			if(true !== confirm('Are you sure you want to change the master key?')) {
-				closeDialog();
-				return;
-			}
+            if (true !== confirm('Are you sure you want to change the master key?')) {
+                closeDialog();
+                return;
+            }
 
-			var newKey = document.getElementById('key').value;
-			var newKeyRepeat = document.getElementById('keyRepeat').value;
+            let newKey = document.getElementById('key').value;
+            let newKeyRepeat = document.getElementById('keyRepeat').value;
 
-			if(newKey !== newKeyRepeat) {
-				alert('New keys do not match!');
-				return;
-			}
+            if (newKey !== newKeyRepeat) {
+                alert('New keys do not match!');
+                return;
+            }
 
-			/* send new passHash to server */
-			var request = new XMLHttpRequest();
+            /* send new passHash to server */
+            let request = new XMLHttpRequest();
 
-			request.onreadystatechange = function() {
-				if(this.readyState === 4 && this.status === 200) {
-					if(this.responseText !== 'success') {
-						alert('key change failed ' + this.responseText);
-					}
-					else {
-						password = newKey;
-						passHash = SHA1(password);
-						sendUpdate();
-						closeDialog();
-					}
-				}
-			};
+            request.onreadystatechange = function () {
+                if (this.readyState === 4 && this.status === 200) {
+                    if (this.responseText !== 'success') {
+                        alert('key change failed ' + this.responseText);
+                    }
+                    else {
+                        password = newKey;
+                        passHash = SHA1(password);
+                        sendUpdate();
+                        closeDialog();
+                    }
+                }
+            };
 
-			var params = 'pwhash=' + passHash + '&newhash=' + SHA1(newKey);
+            let params = 'pwhash=' + passHash + '&newhash=' + SHA1(newKey);
 
-			request.open('POST', 'libupdate.php', false);
-			request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-			request.send(params);
-		});
-	}
+            request.open('POST', 'libupdate.php', false);
+            request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+            request.send(params);
+        });
+    }
 
-	/* this function looks fairly complex -- try to make it simpler when ur
-	 * not as tired */
-	function filterPasswords(val) {
-		var tableBody = document.getElementById('overview').lastChild;
-		var row = tableBody.firstChild, nextRow;
-		var len = list.length;
+    function filterPasswords(val) {
+        passwordListPromise.then(function (list) {
+            doFilter(list, val);
+        });
+    }
+
+	/* FIXME: this function looks fairly complex -- try to make it simpler when ur not as tired */
+	function doFilter(list, val) {
+		let tableBody = document.getElementById('overview').lastChild;
+		let row = tableBody.firstChild, nextRow;
+		let len = list.length;
 		val = val.toLowerCase();
-		var tokens = val.split(' ');
+		let tokens = val.split(' ');
 
-		for(var i = 0, k = 0; i < len; i++, row = nextRow) {
+		for(let i = 0, k = 0; i < len; i++, row = nextRow) {
 			nextRow = row.nextSibling;
 
-			for(var j = 0; j < tokens.length; j++) {
-				var tmp;
+			for(let j = 0; j < tokens.length; j++) {
+				let tmp;
 
 				if(-1 === list[k].title.toLowerCase().indexOf(tokens[j])
 				 && -1 === list[k].comment.toLowerCase().indexOf(tokens[j])) {

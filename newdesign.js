@@ -1,0 +1,247 @@
+"use strict";
+
+var passwordList = [
+    {
+        title: 'test123',
+        url: 'test.com',
+        username: 'marcus',
+        password: 'klaas',
+        comment: 'test case'
+    }
+];
+
+var library = {
+    api_version: 2,
+    library_version: 2,
+    modified: 1, // seconds since epoch
+    blob: null
+};
+
+var password = "test123";
+var iterations = 4096;
+
+// Check that web crypto is even available
+if (!window.crypto || !window.crypto.subtle) {
+    alert("Your browser does not support the Web Cryptography API! This page will not work.");
+}
+
+if (!window.TextEncoder || !window.TextDecoder) {
+    alert("Your browser does not support the Encoding API! This page will not work.");
+}
+
+// encode num in little endian format
+function encodeIvFromNumber(num) {
+    // iv is 16 bytes long
+    let iv = new Uint8Array(16);
+
+    // support num up to 8 bytes long
+    for(let i = 0; i < 8; i++) {
+        iv[i] = num & 255;
+
+        num = num >>> 8;
+    }
+
+    return iv;
+}
+
+function stringToArrayBuffer(string) {
+    let encoder = new TextEncoder("utf-8");
+
+    return encoder.encode(string);
+}
+
+function arrayBufferToString(array) {
+    let decoder = new TextDecoder("utf-8");
+
+    return decoder.decode(array);
+}
+
+function bufferViewToArray(buffer) {
+    let array = new Uint8Array(buffer);
+    let list = [];
+
+    for(let i = 0; i < array.length; i++) {
+        list[i] = array[i];
+    }
+
+    return list;
+}
+
+function bufferViewToBase64(buffer) {
+    let list = bufferViewToArray(buffer);
+
+    return btoa(list);
+}
+
+function b64ToUint6 (nChr) {
+
+    return nChr > 64 && nChr < 91 ?
+    nChr - 65
+        : nChr > 96 && nChr < 123 ?
+    nChr - 71
+        : nChr > 47 && nChr < 58 ?
+    nChr + 4
+        : nChr === 43 ?
+        62
+        : nChr === 47 ?
+        63
+        :
+        0;
+
+}
+
+function base64DecToArr(sBase64, nBlocksSize) {
+    var
+        sB64Enc = sBase64.replace(/[^A-Za-z0-9\+\/]/g, ""), nInLen = sB64Enc.length,
+        nOutLen = nBlocksSize ? Math.ceil((nInLen * 3 + 1 >> 2) / nBlocksSize) * nBlocksSize : nInLen * 3 + 1 >> 2, taBytes = new Uint8Array(nOutLen);
+
+    for (var nMod3, nMod4, nUint24 = 0, nOutIdx = 0, nInIdx = 0; nInIdx < nInLen; nInIdx++) {
+        nMod4 = nInIdx & 3;
+        nUint24 |= b64ToUint6(sB64Enc.charCodeAt(nInIdx)) << 6 * (3 - nMod4);
+        if (nMod4 === 3 || nInLen - nInIdx === 1) {
+            for (nMod3 = 0; nMod3 < 3 && nOutIdx < nOutLen; nMod3++, nOutIdx++) {
+                taBytes[nOutIdx] = nUint24 >>> (16 >>> nMod3 & 24) & 255;
+            }
+            nUint24 = 0;
+
+        }
+    }
+
+    return taBytes;
+}
+
+// First, create a PBKDF2 "key" containing the password
+var cryptoKeyPromise =
+    window.crypto.subtle.importKey(
+        "raw",
+        stringToArrayBuffer(password),
+        {"name": "PBKDF2"},
+        false,
+        ["deriveKey"]
+    )
+    .then(function (baseKey) {
+        return window.crypto.subtle.deriveKey(
+            {
+                "name": "PBKDF2",
+                "salt": encodeIvFromNumber(library.library_version),
+                "iterations": iterations,
+                "hash": {
+                    name: "SHA-1"
+                }
+            },
+            baseKey,
+            {
+                "name": "AES-CBC",
+                "length": 256
+            },
+            false,
+            ["encrypt", "decrypt"]
+        );
+    });
+
+// Encode our password list using previously derived key
+var blobPromise =
+    cryptoKeyPromise.then(function (key) {
+        return crypto.subtle.encrypt(
+            {
+                name: "AES-CBC",
+                iv: encodeIvFromNumber(library.library_version)
+            },
+            key,
+            stringToArrayBuffer(JSON.stringify(passwordList))
+        );
+    })
+    .then(function(result) {
+        var base64 = bufferViewToBase64(result);
+
+        return Promise.resolve(base64);
+    });
+
+var libraryPromise =
+    blobPromise.then(function (blob) {
+        var lib = JSON.parse(JSON.stringify(library)); //clone
+        lib.blob = blob;
+
+        var libText = JSON.stringify(lib);
+
+        return Promise.resolve(libText);
+    });
+
+var hmacKeyPromise =
+    window.crypto.subtle.importKey(
+        "raw",
+        stringToArrayBuffer(password),
+        {
+            name: "HMAC",
+            hash: {
+                name: "SHA-256"
+            }
+        },
+        false,
+        ["sign", "verify"]
+    );
+
+var hmacPromise =
+    Promise
+        .all([libraryPromise, hmacKeyPromise])
+        .then(function (params) {
+            let [libText, key] = params;
+
+            return window.crypto.subtle.sign(
+                {
+                    name: "HMAC"
+                },
+                key,
+                stringToArrayBuffer(libText)
+            );
+        })
+        .then(function (signature) {
+            var sig = bufferViewToBase64(signature);
+
+            return Promise.resolve(sig);
+        });
+
+var verificationPromise =
+    Promise
+        .all([libraryPromise, hmacKeyPromise, hmacPromise])
+        .then(function (params) {
+            let [libText, key, hmac] = params;
+            let decodedHmac = atob(hmac);
+
+            return window.crypto.subtle.verify(
+                {
+                    name: "HMAC"
+                },
+                key,
+                stringToArrayBuffer(decodedHmac),
+                stringToArrayBuffer(libText)
+            );
+        });
+
+var decryptionPromise =
+    Promise
+        .all([verificationPromise, cryptoKeyPromise, libraryPromise])
+        .then(function (params) {
+            let [, key, libText] = params;
+            let lib = JSON.parse(libText);
+            let blob = lib.blob;
+
+            let cryptoText = atob(blob);
+            let realCryptoText = cryptoText.split(',').map(function (int) { return parseInt(int); });
+            let byteArray = new Uint8Array(realCryptoText);
+
+            return crypto.subtle.decrypt(
+                {
+                    name: "AES-CBC",
+                    iv: encodeIvFromNumber(lib.library_version)
+                },
+                key,
+                byteArray
+            );
+        })
+        .then(function (plainText) {
+            console.log('Decryption success: ' + arrayBufferToString(plainText));
+        })
+        .catch(function (error) {
+            console.log('Error: ' + error.message);
+        });

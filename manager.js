@@ -107,13 +107,12 @@ function addComment(row, text) {
 	row.appendChild(node);
 }
 
-function deriveKey(password) {
-    var keyIvPair = openSSLKey(s2a(password), plainText.slice(8, 16));
+function deriveKey(cipherText, password) {
+    var keyIvPair = openSSLKey(s2a(password), cipherText.slice(8, 16));
     var key = new Uint8Array(keyIvPair.key);
     var iv = new Uint8Array(keyIvPair.iv);
-    var cryptoText = new Uint8Array(plainText.slice(16));
 
-    window.crypto.subtle.importKey("raw", key, {name: "AES-CBC"}, false, ["encrypt", "decrypt"])
+    return window.crypto.subtle.importKey("raw", key, {name: "AES-CBC"}, false, ["encrypt", "decrypt"])
         .then(function (key) {
             var pair = {
                 key: key,
@@ -141,7 +140,7 @@ window.onload = function() {
 		request.onreadystatechange = function() {
 			if(this.readyState === 4) {
 				if(this.status === 200)
-					localStorage["enc"] = enc = this.responseText;
+					localStorage["enc"] = enc = s2a(atob(this.responseText));
 				else {
 					offlineMode = true;
 					enc = localStorage["enc"];
@@ -364,12 +363,22 @@ window.onload = function() {
 		};
 
 		dec = {'modified': Math.round(new Date().getTime() / 1000), 'list': list};
-		localStorage["enc"] = enc = GibberishAES.enc(JSON.stringify(dec), password);
-		var params = 'pwhash=' + passHash + '&newlib=' + encodeURIComponent(enc);
 
-		request.open('POST', 'libupdate.php', true);
-		request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-		request.send(params);
+        var prepped = new Uint8Array(s2a(dec));
+
+        crypto.subtle.encrypt({name: "AES-CBC", iv: iv}, cryptoKey, prepped)
+            .then(function (data) {
+                // TODO: do some stuff
+
+                localStorage["enc"] = enc = GibberishAES.enc(JSON.stringify(dec), password);
+                var params = 'pwhash=' + passHash + '&newlib=' + encodeURIComponent(enc);
+
+                request.open('POST', 'libupdate.php', true);
+                request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+                request.send(params);
+            })
+
+
 	}
 
 	document.getElementById('decrypt').addEventListener('submit', function(evt) {
@@ -378,16 +387,14 @@ window.onload = function() {
         password = document.getElementById('encryptionKey').value;
 		passHash = SHA1(password);
 
-        deriveKey(password)
+        deriveKey(enc, password)
             .then(function (keyIvPair) {
                 cryptoKey = keyIvPair.key;
                 iv = new Uint8Array(keyIvPair.iv);
 
-                var cipherText = s2a(atob(enc)); //
-                var cryptoText = new Uint8Array(cipherText.slice(16));
+                var cryptoText = new Uint8Array(enc.slice(16));
 
-                return crypto.subtle.decrypt({name: "AES-CBC", iv: iv}, key, cryptoText);
-
+                return crypto.subtle.decrypt({name: "AES-CBC", iv: iv}, cryptoKey, cryptoText);
             })
             .then(function(result) {
                 var decrypted_data = new Uint8Array(result);

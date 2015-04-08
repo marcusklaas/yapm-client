@@ -1,41 +1,5 @@
 crypto = window.crypto || window.msCrypto;
 
-function a2s(buffer) {
-    var str = '';
-
-    for (var iii = 0; iii < buffer.byteLength; iii++) {
-        str += String.fromCharCode(buffer[iii]);
-    }
-
-    return str;
-}
-
-function s2a(string) {
-    var array = [], i;
-
-    for (i = 0; i < string.length; i++) {
-        array[i] = string.charCodeAt(i);
-    }
-
-    return array;
-}
-
-function openSSLKey(passwordArr, saltArr) {
-    var data00 = passwordArr.concat(saltArr),
-        md5_hash = [md5(data00)],
-        result = md5_hash[0];
-
-    for (var i = 1; i < 3; i++) {
-        md5_hash[i] = md5(md5_hash[i - 1].concat(data00));
-        result = result.concat(md5_hash[i]);
-    }
-
-    return {
-        key: result.slice(0, 32),
-        iv: result.slice(32, 48)
-    };
-}
-
 function passwordEntry() {
 	this.title = 'unnamed';
 	this.url = 'https://marcusklaas.nl';
@@ -47,15 +11,19 @@ function passwordEntry() {
 function randPass(len, alphabet) {
 	var result = '';
 
-	if (!alphabet)
-		alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-		 + '.,?:;[]~!@#$%^&*()-+/';
+	if (!alphabet) {
+        alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
+        + '.,?:;[]~!@#$%^&*()-+/';
+    }
+
 	var alphabetLength = alphabet.length;
 
-	if ((len === undefined) || isNaN(len)) len = 12;
+	if ((len === undefined) || isNaN(len) || len < 6) {
+        len = 12;
+    }
 
-	for (var i = 0; i < len; i++) {
-		var rnd = Math.floor(Math.random() * alphabetLength);
+	for (let i = 0; i < len; i++) {
+		let rnd = Math.floor(Math.random() * alphabetLength);
 		result += alphabet.substring(rnd, rnd + 1);
 	}
 
@@ -105,22 +73,6 @@ function addComment(row, text) {
 	table.appendChild(tableRow);
 	node.appendChild(table);
 	row.appendChild(node);
-}
-
-function deriveKey(cipherText, password) {
-    var keyIvPair = openSSLKey(s2a(password), cipherText.slice(8, 16));
-    var key = new Uint8Array(keyIvPair.key);
-    var iv = new Uint8Array(keyIvPair.iv);
-
-    return window.crypto.subtle.importKey("raw", key, {name: "AES-CBC"}, false, ["encrypt", "decrypt"])
-        .then(function (key) {
-            var pair = {
-                key: key,
-                iv: iv
-            };
-
-            return Promise.resolve(pair);
-        });
 }
 
 window.onload = function() {

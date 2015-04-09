@@ -1,3 +1,5 @@
+TODO: move to github wiki
+
 This is a brief outline of the new design.
 
 Design goals

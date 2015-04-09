@@ -66,23 +66,52 @@ function arrayBufferToHexString(arrayBuffer) {
 function getAsync(url) {
     // Return a new promise.
     return new Promise(function(resolve, reject) {
-        let req = new XMLHttpRequest();
-        req.open('GET', url);
+        let request = new XMLHttpRequest();
+        request.open('GET', url);
 
-        req.onload = function() {
-            if (req.status == 200) {
-                resolve(req.response);
+        request.onload = function() {
+            if (request.status == 200) {
+                resolve(request.response);
             }
             else {
-                reject(Error(req.statusText));
+                reject(Error(request.statusText));
             }
         };
 
-        req.onerror = function() {
+        request.onerror = function() {
             reject(Error("Network Error"));
         };
 
-        req.send();
+        request.send();
+    });
+}
+
+/**
+ * @param url     string
+ * @param library object
+ * @param hash    string
+ * @returns Promise
+ */
+function postLibraryAsync(url, library, hash) {
+    return new Promise(function(resolve, reject) {
+        let request = new XMLHttpRequest();
+
+        request.onreadystatechange = function() {
+            if(this.readyState === 4) {
+                if(this.status !== 200 || this.responseText !== 'success') {
+                    reject(Error(this));
+                }
+                else {
+                    resolve();
+                }
+            }
+        };
+
+        let params = 'pwhash=' + hash + '&newlib=' + encodeURIComponent(JSON.stringify(library));
+
+        request.open('POST', url, true);
+        request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+        request.send(params);
     });
 }
 
@@ -161,6 +190,37 @@ function addComment(row, text) {
 	row.appendChild(node);
 }
 
+/* FIXME: this function looks fairly complex -- try to make it simpler when ur not as tired */
+function doFilter(list, val) {
+    let tableBody = document.getElementById('overview').lastChild;
+    let row = tableBody.firstChild, nextRow;
+    let len = list.length;
+    val = val.toLowerCase();
+    let tokens = val.split(' ');
+
+    for(let i = 0, k = 0; i < len; i++, row = nextRow) {
+        nextRow = row.nextSibling;
+
+        for(let j = 0; j < tokens.length; j++) {
+            if(-1 === list[k].title.toLowerCase().indexOf(tokens[j])
+                && -1 === list[k].comment.toLowerCase().indexOf(tokens[j])) {
+                row.classList.add('hidden');
+
+                /* place row at bottom of list */
+                tableBody.insertBefore(row, null);
+
+                let tmp = list[k];
+                list.splice(k, 1);
+                list[len - 1] = tmp;
+                break;
+            }
+
+            row.classList.remove('hidden');
+            k++;
+        }
+    }
+}
+
 /**
  * @param password string
  * @returns Promise
@@ -173,7 +233,7 @@ function getSha1(password) {
         stringToArrayBuffer(password)
     )
     .then(function(uintArray) {
-        return Promise.resolve(arrayBufferToHexString(uintArray));
+        return arrayBufferToHexString(uintArray);
     });
 }
 
@@ -229,9 +289,7 @@ function encryptObject(key, obj, version) {
         stringToArrayBuffer(JSON.stringify(obj))
     )
     .then(function(result) {
-        let base64 = bufferViewToBase64(result);
-
-        return Promise.resolve(base64);
+        return bufferViewToBase64(result);
     });
 }
 
@@ -283,19 +341,17 @@ function getObjectHmac(key, obj) {
         stringToArrayBuffer(libText)
     )
     .then(function (signature) {
-        let sig = bufferViewToBase64(signature);
-
-        return Promise.resolve(sig);
+        return bufferViewToBase64(signature);
     });
 }
 
 /**
  * @param key  HmacKey
- * @param json string
+ * @param obj  obj
  * @param hmac string (base64 encoding)
  * @returns Promise
  */
-function verifyHmac(key, json, hmac) {
+function verifyHmac(key, obj, hmac) {
     let decodedHmac = atob(hmac);
 
     return window.crypto.subtle.verify(
@@ -304,13 +360,12 @@ function verifyHmac(key, json, hmac) {
         },
         key,
         stringToArrayBuffer(decodedHmac),
-        stringToArrayBuffer(json)
+        stringToArrayBuffer(JSON.stringify(obj))
     );
 }
 
 function decryptLibrary(key, library) {
     let blob = library.blob;
-
     let cryptoText = atob(blob);
     let rawCryptoBytes = cryptoText.split(',').map(function (int) { return parseInt(int); }); // FIXME: this could probably be done more efficiently
     let byteArray = new Uint8Array(rawCryptoBytes);
@@ -324,9 +379,7 @@ function decryptLibrary(key, library) {
         byteArray
     )
     .then(function (plainText) {
-        let obj = JSON.parse(arrayBufferToString(plainText));
-
-        return Promise.resolve(obj);
+        return JSON.parse(arrayBufferToString(plainText));
     });
 }
 
@@ -343,40 +396,48 @@ window.onload = function() {
 
     let idleTime = 0;
 
-    let passwordListPromise = (function (url) {
-        let libraryPromise = getAsync(url)
-            .then(function (clearText) {
-                return Promise.resolve(JSON.parse(clearText));
-            });
+    let passwordPromise = new Promise(function (resolve, reject) {
+        document.getElementById('decrypt').addEventListener('submit', function (evt) {
+            evt.preventDefault();
 
-        let passwordPromise = new Promise(function (resolve, reject) {
-            document.getElementById('decrypt').addEventListener('submit', function (evt) {
-                evt.preventDefault();
+            let password = document.getElementById('encryptionKey').value;
 
-                let password = document.getElementById('encryptionKey').value;
+            document.getElementById('encryptionKey').value = '';
 
-                document.getElementById('encryptionKey').value = '';
+            resolve(password);
+        });
+    });
 
-                resolve(password);
-            });
+    let hmacKeyPromise = passwordPromise.then(function (password) {
+        return getHmacKey(password);
+    });
+
+    let libraryPromise = Promise.all([getAsync(downloadUrl), hmacKeyPromise])
+        .then(function (params) {
+            let [libraryJson, key] = params;
+            let library = JSON.parse(libraryJson);
+
+            return verifyHmac(key, library.library, library.hmac)
+                .then(function () {
+                    return library.library;
+                });
         });
 
-        let aesKeyPromise = Promise
-            .all([passwordPromise, libraryPromise])
-            .then(function (params) {
-                let [password, library] = params;
+    let aesKeyPromise = Promise
+        .all([passwordPromise, libraryPromise])
+        .then(function (params) {
+            let [password, library] = params;
 
-                return getAesKey(password, library.library_version);
-            });
+            return getAesKey(password, library.library_version);
+        });
 
-        return Promise
-            .all([aesKeyPromise, libraryPromise])
-            .then(function (params) {
-                let [key, library] = params;
+    let passwordListPromise = Promise
+        .all([aesKeyPromise, libraryPromise])
+        .then(function (params) {
+            let [key, library] = params;
 
-                return decryptLibrary(key, library);
-            });
-    })(downloadUrl);
+            return decryptLibrary(key, library);
+        });
 
     passwordListPromise
         .then(function (passwordList) {
@@ -584,14 +645,7 @@ window.onload = function() {
     }
 
     function sendUpdate() {
-        let request = new XMLHttpRequest();
 
-        request.onreadystatechange = function () {
-            if (this.readyState === 4 && this.status === 200) {
-                if (this.responseText !== 'success')
-                    alert('lib update failed ' + this.responseText);
-            }
-        };
 
         dec = {'modified': Math.round(new Date().getTime() / 1000), 'list': list};
 
@@ -681,38 +735,6 @@ window.onload = function() {
             doFilter(list, val);
         });
     }
-
-	/* FIXME: this function looks fairly complex -- try to make it simpler when ur not as tired */
-	function doFilter(list, val) {
-		let tableBody = document.getElementById('overview').lastChild;
-		let row = tableBody.firstChild, nextRow;
-		let len = list.length;
-		val = val.toLowerCase();
-		let tokens = val.split(' ');
-
-		for(let i = 0, k = 0; i < len; i++, row = nextRow) {
-			nextRow = row.nextSibling;
-
-			for(let j = 0; j < tokens.length; j++) {
-				let tmp;
-
-				if(-1 === list[k].title.toLowerCase().indexOf(tokens[j])
-				 && -1 === list[k].comment.toLowerCase().indexOf(tokens[j])) {
-					row.classList.add('hidden');
-
-					/* place row at bottom of list */
-					tableBody.insertBefore(row, null);
-					tmp = list[k];
-					list.splice(k, 1);
-					list[len - 1] = tmp;
-					break;
-				}
-
-				row.classList.remove('hidden');
-				k++;
-			}
-		}
-	}
 
 	document.getElementById('filter').addEventListener('keyup', function(evt) {
 		filterPasswords(this.value);

@@ -190,6 +190,19 @@ var hmacPromise =
             return Promise.resolve(sig);
         });
 
+Promise.all([libraryPromise, hmacPromise])
+    .then(function (params) {
+        let [lib, hmac] = params;
+
+        let signedLibrary = {
+            library: JSON.parse(lib),
+            hmac: hmac
+        };
+
+        console.log(JSON.stringify(signedLibrary));
+    });
+
+
 var verificationPromise =
     Promise
         .all([libraryPromise, hmacKeyPromise, hmacPromise])
@@ -234,7 +247,3 @@ var decryptionPromise =
         .catch(function (error) {
             console.log('Error: ' + error.message);
         });
-
-libraryPromise.then(function (lib) {
-    console.log(lib);
-});

@@ -1,2 +1,3 @@
-encrypted/*
-passhash.txt
+encrypted/
+.idea/
+node_modules/

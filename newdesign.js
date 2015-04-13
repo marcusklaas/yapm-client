@@ -112,7 +112,7 @@ var cryptoKeyPromise =
         return window.crypto.subtle.deriveKey(
             {
                 "name": "PBKDF2",
-                "salt": encodeIvFromNumber(library.library_version),
+                "salt": new Uint8Array(16),
                 "iterations": 4096,
                 "hash": {
                     name: "SHA-1"

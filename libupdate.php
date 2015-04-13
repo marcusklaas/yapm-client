@@ -9,36 +9,39 @@ if(false === $doubleHash) {
 	die('failed reading hash file');
 }
 
-if(isset($_POST['pwhash']) && isset($_POST['newhash'])) {
-	if(sha1($_POST['pwhash']) !== $doubleHash) {
-		die('incorrect password');
-    }
+function getBackupPath($libraryPath, $fileExtension) {
+	$i = 1;
 
-	if(!file_put_contents($hashfile, sha1($_POST['newhash']))) {
-		die('failed writing new hash to file');
-    }
+	for(; file_exists($libraryPath.$i.'.'.$fileExtension); $i++);
 
-	die('success');
+	return $libraryPath.$i.'.'.$fileExtension;
 }
+
+// TODO: indicate success/ failure using http status codes instead of response text!
 
 if(isset($_POST['pwhash']) && isset($_POST['newlib'])) {
 	if(sha1($_POST['pwhash']) !== $doubleHash) {
 		die('incorrect password');
     }
 
-	if(file_exists($pwlib.'.'.$pwlibext)) {
-		$i = 1;
+	$libraryPath = $pwlib.'.'.$pwlibext;
+    $backupPath = getBackupPath($pwlib, $pwlibext);
 
-		for(; file_exists($pwlib.$i.'.'.$pwlibext); $i++);
-
-		if(!rename($pwlib.'.'.$pwlibext, $pwlib.$i.'.'.$pwlibext)) {
-			die('rename failed');
-        }
+	if(file_exists($libraryPath) && ! rename($libraryPath, $backupPath)) {
+		die('rename failed');
 	}
 
-	if(!file_put_contents($pwlib.'.'.$pwlibext, $_POST['newlib'])) {
+	if( ! file_put_contents($libraryPath, $_POST['newlib'])) {
 		die('file write failed');
     }
+
+	if(isset($_POST['newhash']) && ! file_put_contents($hashfile, sha1($_POST['newhash']))) {
+		if ( ! rename($backupPath, $libraryPath)) {
+			die('changed password, but was unable to restore library! This is a big deal!');
+		}
+
+		die('failed writing new hash to file');
+	}
 
 	die('success');
 }

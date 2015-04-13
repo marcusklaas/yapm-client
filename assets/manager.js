@@ -1,7 +1,7 @@
-// FIXME: use crypto everywhere instead of window.crypto -- or are these equivalent to each other?
-crypto = window.crypto || window.msCrypto;
+crypto = crypto || window.msCrypto;
 downloadUrl = 'encrypted/passwords.txt?noCache=' + Math.floor(Math.random() * 1e6);
-maxIdleTime = 20; // seconds
+uploadUrl = 'libupdate.php';
+maxIdleTime = 10; // seconds
 
 // encode num in little endian format
 function encodeIvFromNumber(num) {
@@ -31,7 +31,7 @@ function arrayBufferToString(array) {
 }
 
 function bufferViewToArray(buffer) {
-    let array = new Uint8Array(buffer);
+    const array = new Uint8Array(buffer);
     let list = [];
 
     for(let i = 0; i < array.length; i++) {
@@ -90,9 +90,20 @@ function getAsync(url) {
  * @param url     string
  * @param library object
  * @param hash    string
+ * @param newHash string
  * @returns Promise
  */
-function postLibraryAsync(url, library, hash) {
+function postLibraryAsync(url, library, hash, newHash) {
+    let params = 'pwhash=' + hash + '&newlib=' + encodeURIComponent(JSON.stringify(library));
+
+    if (newHash) {
+        params += `&newhash=${newHash}`;
+    }
+
+    return postAsync(url, params);
+}
+
+function postAsync(url, params) {
     return new Promise(function(resolve, reject) {
         let request = new XMLHttpRequest();
 
@@ -107,15 +118,13 @@ function postLibraryAsync(url, library, hash) {
             }
         };
 
-        let params = 'pwhash=' + hash + '&newlib=' + encodeURIComponent(JSON.stringify(library));
-
         request.open('POST', url, true);
         request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
         request.send(params);
     });
 }
 
-function passwordEntry() {
+function PasswordEntry() {
 	this.title = 'unnamed';
 	this.url = 'https://marcusklaas.nl';
 	this.username = 'anon';
@@ -226,24 +235,21 @@ function doFilter(list, val) {
  * @returns Promise
  */
 function getSha1(password) {
-    return window.crypto.subtle.digest(
+    return crypto.subtle.digest(
         {
             name: "SHA-1"
         },
         stringToArrayBuffer(password)
     )
-    .then(function(uintArray) {
-        return arrayBufferToHexString(uintArray);
-    });
+    .then(uintArray => arrayBufferToHexString(uintArray));
 }
 
 /**
  * @param password string
- * @param version  int
  * @returns Promise
  */
-function getAesKey(password, version) {
-    return window.crypto.subtle.importKey(
+function getAesKey(password) {
+    return crypto.subtle.importKey(
         "raw",
         stringToArrayBuffer(password),
         {
@@ -252,11 +258,11 @@ function getAesKey(password, version) {
         false,
         ["deriveKey"]
     )
-    .then(function (baseKey) {
-        return window.crypto.subtle.deriveKey(
+    .then(baseKey =>
+        crypto.subtle.deriveKey(
             {
                 "name": "PBKDF2",
-                "salt": encodeIvFromNumber(version),
+                "salt": new Uint8Array(16),
                 "iterations": 4096,
                 "hash": {
                     name: "SHA-1"
@@ -269,8 +275,8 @@ function getAesKey(password, version) {
             },
             false,
             ["encrypt", "decrypt"]
-        );
-    });
+        )
+    );
 }
 
 /**
@@ -288,9 +294,7 @@ function encryptObject(key, obj, version) {
         key,
         stringToArrayBuffer(JSON.stringify(obj))
     )
-    .then(function(result) {
-        return bufferViewToBase64(result);
-    });
+    .then(result => bufferViewToBase64(result));
 }
 
 /**
@@ -301,10 +305,10 @@ function encryptObject(key, obj, version) {
  */
 function createLibrary(blob, libraryVersion, apiVersion) {
     return {
-        blob: JSON.stringify(blob),
+        blob: blob,
         library_version: libraryVersion,
         api_version: apiVersion,
-        modified: 0 // TODO: seconds since epoch
+        modified: Math.round(new Date().getTime() / 1000)
     };
 }
 
@@ -313,7 +317,7 @@ function createLibrary(blob, libraryVersion, apiVersion) {
  * @returns Promise
  */
 function getHmacKey(password) {
-    return window.crypto.subtle.importKey(
+    return crypto.subtle.importKey(
         "raw",
         stringToArrayBuffer(password),
         {
@@ -333,16 +337,14 @@ function getHmacKey(password) {
  * @returns Promise containing string (base64 encoding)
  */
 function getObjectHmac(key, obj) {
-    return window.crypto.subtle.sign(
+    return crypto.subtle.sign(
         {
             name: "HMAC"
         },
         key,
-        stringToArrayBuffer(libText)
+        stringToArrayBuffer(JSON.stringify(obj))
     )
-    .then(function (signature) {
-        return bufferViewToBase64(signature);
-    });
+    .then(signature => bufferViewToBase64(signature));
 }
 
 /**
@@ -352,9 +354,9 @@ function getObjectHmac(key, obj) {
  * @returns Promise
  */
 function verifyHmac(key, obj, hmac) {
-    let decodedHmac = atob(hmac);
+    const decodedHmac = atob(hmac);
 
-    return window.crypto.subtle.verify(
+    return crypto.subtle.verify(
         {
             name: "HMAC"
         },
@@ -365,10 +367,10 @@ function verifyHmac(key, obj, hmac) {
 }
 
 function decryptLibrary(key, library) {
-    let blob = library.blob;
-    let cryptoText = atob(blob);
-    let rawCryptoBytes = cryptoText.split(',').map(function (int) { return parseInt(int); }); // FIXME: this could probably be done more efficiently
-    let byteArray = new Uint8Array(rawCryptoBytes);
+    const blob = library.blob;
+    const cryptoText = atob(blob);
+    const rawCryptoBytes = cryptoText.split(',').map(function (int) { return parseInt(int); }); // FIXME: this could probably be done more efficiently
+    const byteArray = new Uint8Array(rawCryptoBytes);
 
     return crypto.subtle.decrypt(
         {
@@ -378,78 +380,81 @@ function decryptLibrary(key, library) {
         key,
         byteArray
     )
-    .then(function (plainText) {
-        return JSON.parse(arrayBufferToString(plainText));
-    });
+    .then(plainText => JSON.parse(arrayBufferToString(plainText)));
 }
 
 // TODO: rebuild offline mode
 window.onload = function() {
     // Check that web crypto is even available
-    if (!window.crypto || !window.crypto.subtle) {
-        alert("Your browser does not support the Web Cryptography API! This page will not work.");
+    if (!crypto || !crypto.subtle) {
+        return alert("Your browser does not support the Web Cryptography API! This page will not work.");
     }
 
     if (!window.TextEncoder || !window.TextDecoder) {
-        alert("Your browser does not support the Encoding API! This page will not work.");
+        return alert("Your browser does not support the Encoding API! This page will not work.");
     }
 
+    document.getElementById('decrypt').addEventListener('submit', function (evt) {
+        evt.preventDefault();
+
+        const password = document.getElementById('encryptionKey').value;
+        document.getElementById('encryptionKey').value = '';
+
+        decodeListAndShow(password);
+    });
+
     let idleTime = 0;
+    let list = null;
+    let passwordHash = null;
+    let hmacKey = null;
+    let aesKey = null;
+    let libraryVersion = null;
+    let downloadPromise = getAsync(downloadUrl);
 
-    let passwordPromise = new Promise(function (resolve, reject) {
-        document.getElementById('decrypt').addEventListener('submit', function (evt) {
-            evt.preventDefault();
-
-            let password = document.getElementById('encryptionKey').value;
-
-            document.getElementById('encryptionKey').value = '';
-
-            resolve(password);
-        });
-    });
-
-    let hmacKeyPromise = passwordPromise.then(function (password) {
-        return getHmacKey(password);
-    });
-
-    let libraryPromise = Promise.all([getAsync(downloadUrl), hmacKeyPromise])
-        .then(function (params) {
-            let [libraryJson, key] = params;
-            let library = JSON.parse(libraryJson);
-
-            return verifyHmac(key, library.library, library.hmac)
-                .then(function () {
-                    return library.library;
-                });
+    function decodeListAndShow(password) {
+        getSha1(password).then(hash => {
+            passwordHash = hash;
         });
 
-    let aesKeyPromise = Promise
-        .all([passwordPromise, libraryPromise])
-        .then(function (params) {
-            let [password, library] = params;
+        let hmacKeyPromise = getHmacKey(password);
 
-            return getAesKey(password, library.library_version);
+        hmacKeyPromise.then(key => {
+            hmacKey = key;
         });
 
-    let passwordListPromise = Promise
-        .all([aesKeyPromise, libraryPromise])
-        .then(function (params) {
-            let [key, library] = params;
+        let aesKeyPromise = getAesKey(password);
 
-            return decryptLibrary(key, library);
+        aesKeyPromise.then(key => {
+            aesKey = key;
         });
 
-    passwordListPromise
-        .then(function (passwordList) {
-            displayList(passwordList);
+        let libraryPromise = Promise.all([downloadPromise, hmacKeyPromise])
+            .then(([libraryJson, key]) => {
+                const library = JSON.parse(libraryJson);
 
-            document.getElementById('authorized').className = '';
-            document.getElementById('unauthorized').className = 'hidden';
-            document.getElementById('filter').focus();
-        })
-        .catch(function (error) {
-            alert('Something went wrong: ' + error.message);
+                return verifyHmac(key, library.library, library.hmac)
+                    .then(() => library.library);
+            });
+
+        libraryPromise.then(library => {
+            libraryVersion = library.library_version;
         });
+        let passwordListPromise = Promise
+            .all([aesKeyPromise, libraryPromise])
+            .then(([key, library]) => decryptLibrary(key, library));
+
+        passwordListPromise
+            .then(passwordList => {
+                list = passwordList;
+
+                displayList(passwordList);
+
+                document.getElementById('authorized').className = '';
+                document.getElementById('unauthorized').className = 'hidden';
+                document.getElementById('filter').focus();
+            })
+            .catch(error => alert('Something went wrong: ' + error.message));
+    }
 
     document.getElementById('encryptionKey').focus();
 
@@ -508,11 +513,11 @@ window.onload = function() {
     document.getElementById('modalClose1').addEventListener('click', closeDialog);
     document.getElementById('modalClose2').addEventListener('click', closeDialog);
 
-    document.getElementById('save').addEventListener('click', function (evt) {
+    document.getElementById('save').addEventListener('click', evt => {
         evt.preventDefault();
 
         let index = parseInt(document.getElementById('editModal').getAttribute('data-index'));
-        let pwdEntry = new passwordEntry;
+        let pwdEntry = new PasswordEntry;
         pwdEntry.title = document.getElementById('title').value;
         pwdEntry.url = document.getElementById('URL').value;
         pwdEntry.username = document.getElementById('username').value;
@@ -520,8 +525,7 @@ window.onload = function() {
         pwdEntry.comment = document.getElementById('comment').value;
 
         if (pwdEntry.password !== document.getElementById('passRepeat').value) {
-            alert('Passwords do not match!');
-            return;
+            return alert('Passwords do not match!');
         }
 
         if (index === -1) {
@@ -548,15 +552,19 @@ window.onload = function() {
             node.nextSibling.innerHTML = pwdEntry.comment;
         }
 
-        sendUpdate();
+        sendUpdate()
+            .then(() => console.log('Successfully updated library!'))
+            .catch(e => alert('Failed updating library: ' + e.message));
+
         closeDialog();
     });
 
     function deletePassword(evt) {
         evt.preventDefault();
 
-        if (!confirm("Are you totally sure you want to delete this password?"))
+        if ( ! confirm("Are you totally sure you want to delete this password?")) {
             return;
+        }
 
         let i = 0, row = this.parentNode.parentNode;
 
@@ -576,7 +584,7 @@ window.onload = function() {
         evt.preventDefault();
     }
 
-    function editPassword(evt) {
+    function editPassword() {
         let row = this.parentNode.parentNode;
         let i = 0;
 
@@ -623,16 +631,19 @@ window.onload = function() {
         tbody.appendChild(row);
     }
 
-    function displayList(list) {
+    function displayList(passwordList) {
         let tableBody = document.getElementById('overview').lastChild;
 
-        for (let i = 0; i < list.length; i++) {
-            addRow(tableBody, list[i]);
+        for (let i = 0; i < passwordList.length; i++) {
+            addRow(tableBody, passwordList[i]);
         }
     }
 
     function logout() {
-        passwordListPromise = null;
+        list = null;
+        hmacKey = null;
+        aesKey = null;
+        passwordHash = null;
 
         document.getElementById('overview').lastChild.innerHTML = '';
         document.getElementById('encryptionKey').focus();
@@ -644,15 +655,25 @@ window.onload = function() {
         document.getElementById('passRepeat').value = '';
     }
 
-    function sendUpdate() {
+    function sendUpdate(newHash) {
+        libraryVersion += 1;
 
+        let blobPromise = encryptObject(aesKey, list, libraryVersion);
+        let libraryPromise = blobPromise.then(blob => createLibrary(blob, libraryVersion, 2 /* api version */));
+        let hmacPromise = libraryPromise.then(library => getObjectHmac(hmacKey, library));
 
-        dec = {'modified': Math.round(new Date().getTime() / 1000), 'list': list};
+        return Promise.all([libraryPromise, hmacPromise])
+            .then(([library, hmac]) => {
+                const signedLib = {
+                    library: library,
+                    hmac:hmac
+                };
 
-        // TODO: moar stuff, of course
+                return postLibraryAsync(uploadUrl, signedLib, passwordHash, newHash);
+            });
     }
 
-    document.getElementById('randPass').addEventListener('click', function (evt) {
+    document.getElementById('randPass').addEventListener('click', evt => {
         let newPassword = randPass();
 
         document.getElementById('pass').value = newPassword;
@@ -660,7 +681,6 @@ window.onload = function() {
 
         evt.preventDefault();
     });
-
 
     if (false /* offline mode */) {
         let buttons = document.getElementsByClassName('newPassword');
@@ -677,66 +697,65 @@ window.onload = function() {
             editDialog(-1);
         }
 
-        function newMasterPW(evt) {
+        function newMasterPW() {
             document.getElementById('masterkeyModal').classList.remove('hidden');
         }
 
         let buttons = document.getElementsByClassName('newPassword');
-        for (let i = 0; i < buttons.length; i++)
+        for (let i = 0; i < buttons.length; i++) {
             buttons[i].addEventListener('click', newPW);
+        }
 
         buttons = document.getElementsByClassName('newMasterKey');
-        for (let i = 0; i < buttons.length; i++)
+        for (let i = 0; i < buttons.length; i++) {
             buttons[i].addEventListener('click', newMasterPW);
+        }
 
-        document.getElementById('saveKey').addEventListener('click', function (evt) {
+        document.getElementById('saveKey').addEventListener('click', evt => {
             evt.preventDefault();
 
-            if (true !== confirm('Are you sure you want to change the master key?')) {
-                closeDialog();
-                return;
+            if ( ! confirm('Are you sure you want to change the master key?')) {
+                return closeDialog();
             }
 
-            let newKey = document.getElementById('key').value;
-            let newKeyRepeat = document.getElementById('keyRepeat').value;
+            const newKey = document.getElementById('key').value;
+            const newKeyRepeat = document.getElementById('keyRepeat').value;
 
             if (newKey !== newKeyRepeat) {
-                alert('New keys do not match!');
-                return;
+                return alert('New keys do not match!');
             }
 
-            /* send new passHash to server */
-            let request = new XMLHttpRequest();
+            let hmacKeyPromise = getHmacKey(newKey);
+            let aesKeyPromise = getAesKey(newKey);
+            let hashPromise = getSha1(newKey);
 
-            request.onreadystatechange = function () {
-                if (this.readyState === 4 && this.status === 200) {
-                    if (this.responseText !== 'success') {
-                        alert('key change failed ' + this.responseText);
-                    }
-                    else {
-                        password = newKey;
-                        passHash = SHA1(password);
-                        sendUpdate();
-                        closeDialog();
-                    }
-                }
-            };
+            let updatePromise = Promise.all([hmacKeyPromise, aesKeyPromise, hashPromise])
+                .then(([newHmacKey, newAesKey, newHash]) => {
+                    hmacKey = newHmacKey;
+                    aesKey = newAesKey;
 
-            let params = 'pwhash=' + passHash + '&newhash=' + SHA1(newKey);
+                    return sendUpdate(newHash)
+                });
 
-            request.open('POST', 'libupdate.php', false);
-            request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-            request.send(params);
+            Promise.all([updatePromise, hashPromise])
+                .then(([_, newHash]) => {
+                    passwordHash = newHash;
+                });
+
+            updatePromise
+                .then(() => {
+                    closeDialog();
+                    console.log('Password update is a success!');
+                })
+                .catch(e => alert('Failed updating password: ' + e.message));
         });
     }
 
     function filterPasswords(val) {
-        passwordListPromise.then(function (list) {
-            doFilter(list, val);
-        });
+        doFilter(list, val);
     }
 
 	document.getElementById('filter').addEventListener('keyup', function(evt) {
 		filterPasswords(this.value);
 	});
-}
+};

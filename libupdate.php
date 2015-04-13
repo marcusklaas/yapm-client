@@ -65,13 +65,29 @@ if ( ! function_exists('http_response_code')) {
     }
 }
 
+function getLibraryVersion($json) {
+    if (gettype($json) !== 'string') {
+        dieWithError(500, 'couldn\'t read library from disk');
+    }
+
+    $object = json_decode($json, true);
+
+    if (null === $object || ! isset($object['library']) || ! isset($object['library']['library_version'])) {
+        dieWithError(400, 'invalid library');
+    }
+
+    $version = intval($object['library']['library_version']);
+
+    if (0 === $version) {
+        dieWithError(400, 'invalid library version');
+    }
+
+    return $version;
+}
+
 function dieWithError($statusCode, $message) {
     http_response_code($statusCode);
     die($message);
-}
-
-if(false === $doubleHash) {
-    dieWithError(500, 'failed reading hash file');
 }
 
 function getBackupPath($libraryPath, $fileExtension) {
@@ -82,31 +98,47 @@ function getBackupPath($libraryPath, $fileExtension) {
     return $libraryPath.$i.'.'.$fileExtension;
 }
 
-if(isset($_POST['pwhash']) && isset($_POST['newlib'])) {
-    if(sha1($_POST['pwhash']) !== $doubleHash) {
-        dieWithError(401, 'incorrect password hash');
-    }
-
-    $libraryPath = $pwlib.'.'.$pwlibext;
-    $backupPath = getBackupPath($pwlib, $pwlibext);
-
-    if(file_exists($libraryPath) && ! rename($libraryPath, $backupPath)) {
-        dieWithError(500, 'backup of old library failed');
-    }
-
-    if( ! file_put_contents($libraryPath, $_POST['newlib'])) {
-        dieWithError(500, 'failed writing new library to disk');
-    }
-
-    if(isset($_POST['newhash']) && ! file_put_contents($hashfile, sha1($_POST['newhash']))) {
-        if ( ! rename($backupPath, $libraryPath)) {
-            dieWithError(500, 'changed password, but was unable to restore library');
-        }
-
-        dieWithError(500, 'failed writing new hash to file');
-    }
-
-    die('success');
+if(false === $doubleHash) {
+    dieWithError(500, 'failed reading hash file');
 }
 
-dieWithError(400, 'this page is for machines only!');
+if( ! isset($_POST['pwhash']) || ! isset($_POST['newlib'])) {
+    dieWithError(400, 'this page is for machines only!');
+}
+
+if(sha1($_POST['pwhash']) !== $doubleHash) {
+    dieWithError(401, 'incorrect password hash');
+}
+
+$libraryPath = $pwlib.'.'.$pwlibext;
+$backupPath = getBackupPath($pwlib, $pwlibext);
+
+// read current library, get version
+$library = file_get_contents($libraryPath);
+$previousVersion = getLibraryVersion($library);
+
+// read new library, get version
+$newVersion = getLibraryVersion($_POST['newlib']);
+
+// make sure new version is 1 greater than old version
+if ($previousVersion + 1 !== $newVersion) {
+    dieWithError(400, 'version mismatch');
+}
+
+if(file_exists($libraryPath) && ! rename($libraryPath, $backupPath)) {
+    dieWithError(500, 'backup of old library failed');
+}
+
+if( ! file_put_contents($libraryPath, $_POST['newlib'])) {
+    dieWithError(500, 'failed writing new library to disk');
+}
+
+if(isset($_POST['newhash']) && ! file_put_contents($hashfile, sha1($_POST['newhash']))) {
+    if ( ! rename($backupPath, $libraryPath)) {
+        dieWithError(500, 'changed password, but was unable to restore library');
+    }
+
+    dieWithError(500, 'failed writing new hash to file');
+}
+
+die('success');

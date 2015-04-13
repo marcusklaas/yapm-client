@@ -125,78 +125,78 @@ function postAsync(url, params) {
 }
 
 function PasswordEntry() {
-	this.title = 'unnamed';
-	this.url = 'https://marcusklaas.nl';
-	this.username = 'anon';
-	this.password = 'password';
-	this.comment = '';
+    this.title = 'unnamed';
+    this.url = 'https://marcusklaas.nl';
+    this.username = 'anon';
+    this.password = 'password';
+    this.comment = '';
 }
 
 function randPass(len, alphabet) {
-	let result = '';
+    let result = '';
 
-	if (!alphabet) {
+    if (!alphabet) {
         alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
         + '.,?:;[]~!@#$%^&*()-+/';
     }
 
-	let alphabetLength = alphabet.length;
+    let alphabetLength = alphabet.length;
 
-	if ((len === undefined) || isNaN(len) || len < 6) {
+    if ((len === undefined) || isNaN(len) || len < 6) {
         len = 12;
     }
 
-	for (let i = 0; i < len; i++) {
-		let rnd = Math.floor(Math.random() * alphabetLength);
-		result += alphabet.substring(rnd, rnd + 1);
-	}
+    for (let i = 0; i < len; i++) {
+        let rnd = Math.floor(Math.random() * alphabetLength);
+        result += alphabet.substring(rnd, rnd + 1);
+    }
 
-	return result;
+    return result;
 }
 
 function selectText() {
-	if (document.selection) {
-		let range = document.body.createTextRange();
-		range.moveToElementText(this);
-		range.select();
-	} else if (window.getSelection) {
-		let range = document.createRange();
-		range.selectNode(this);
-		window.getSelection().addRange(range);
-	}
+    if (document.selection) {
+        let range = document.body.createTextRange();
+        range.moveToElementText(this);
+        range.select();
+    } else if (window.getSelection) {
+        let range = document.createRange();
+        range.selectNode(this);
+        window.getSelection().addRange(range);
+    }
 }
 
 function addObscuredCell(row, text) {
-	let node = document.createElement('td');
-	let span = document.createElement('div');
-	span.className = 'obscured';
-	span.innerHTML = text;
-	span.addEventListener('click', selectText);
-	node.appendChild(span);
-	row.appendChild(node);
+    let node = document.createElement('td');
+    let span = document.createElement('div');
+    span.className = 'obscured';
+    span.innerHTML = text;
+    span.addEventListener('click', selectText);
+    node.appendChild(span);
+    row.appendChild(node);
 }
 
 function addLinkCell(row, url, text) {
-	let node = document.createElement('td');
-	let anchor = document.createElement('a');
-	anchor.href = url;
-	anchor.innerHTML = text;
-	anchor.target = '_blank';
-	node.appendChild(anchor);
-	row.appendChild(node);
+    let node = document.createElement('td');
+    let anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.innerHTML = text;
+    anchor.target = '_blank';
+    node.appendChild(anchor);
+    row.appendChild(node);
 }
 
 function addComment(row, text) {
-	let node = document.createElement('td');
-	let table = document.createElement('table');
-	let tableRow = document.createElement('tr');
-	let cell = document.createElement('td');
-	table.className = 'comment';
-	cell.innerHTML = text;
-	tableRow.appendChild(cell);
-	table.appendChild(tableRow);
-	node.appendChild(table);
-	row.appendChild(node);
+    let node = document.createElement('td');
+    let table = document.createElement('table');
+    let tableRow = document.createElement('tr');
+    let cell = document.createElement('td');
+    table.className = 'comment';
+    cell.innerHTML = text;
+    tableRow.appendChild(cell);
+    table.appendChild(tableRow);
+    node.appendChild(table);
+    row.appendChild(node);
 }
 
 /* FIXME: this function looks fairly complex -- try to make it simpler when ur not as tired */
@@ -760,7 +760,7 @@ window.onload = function() {
         doFilter(list, val);
     }
 
-	document.getElementById('filter').addEventListener('keyup', function(evt) {
-		filterPasswords(this.value);
-	});
+    document.getElementById('filter').addEventListener('keyup', function(evt) {
+        filterPasswords(this.value);
+    });
 };

@@ -4,11 +4,16 @@
 <head>
     <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
     <title>Passwords</title>
+	<!-- build:js manager.min.js -->
     <script src="manager.js" type="application/javascript;version=1.8"></script>
+	<!-- /build -->
     <link rel="icon" type="image/png" href="favicon.png" />
+
+	<!-- build:css tidy.css -->
     <link rel="stylesheet" type="text/css" href="style.css" />
     <link rel="stylesheet" type="text/css" href="bootstrap.css" />
     <link rel="stylesheet" type="text/css" href="font-awesome.css" />
+	<!-- /build -->
 </head>
 
 <body>
@@ -51,7 +56,7 @@
 		<table class="table table-striped" id="tableHeader">
 			<thead>
 				<tr>
-					<th>Name</th><th>User</th><th>Password</th><th>Comment</th><th>Actions</th>
+					<th>Title</th><th>Username</th><th>Password</th><th>Comment</th><th>Actions</th>
 				</tr>
 			</thead>
 			<tbody></tbody></table>
@@ -65,10 +70,12 @@
 		<table class="table table-striped" id="overview">
 			<thead>
 				<tr>
-					<th>Title</th><th>Username</th><th>Password</th><th>Comment</th><th></th>
+					<th>Title</th><th>Username</th><th>Password</th><th>Comment</th><th>Actions</th>
 				</tr>
 			</thead>
-			<tbody></tbody></table>
+			<tbody><tr>
+				<td>Dummy</td><td>Dummy</td><td>Dummy</td><td>Dummy</td><td>Dumgmy</td>
+			</tr></tbody></table>
 	</div>
 
 	<!---- new password/ edit password window --->
@@ -81,7 +88,7 @@
 		<h4 class="modal-title" id="modalHeader">Edit Password</h4>
 	</div>
 
-	<form id="newPasswordForm" class="modal-body form-horizontal" autocomplete="off">
+	<form class="modal-body form-horizontal" autocomplete="off">
 		<div class="form-group">
 		<label class="col-sm-4 control-label" for="title">Title</label>
 		<div class="col-sm-8">
@@ -145,7 +152,7 @@
 		<h4 class="modal-title">Edit Password</h4>
 	</div>
 
-	<form id="newPasswordForm" class="modal-body form-horizontal" autocomplete="off">
+	<form class="modal-body form-horizontal" autocomplete="off">
 		<div class="form-group">
 		<label class="col-sm-4 control-label" for="key">New Master Key</label>
 		<div class="col-sm-8">

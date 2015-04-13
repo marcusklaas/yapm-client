@@ -13,7 +13,7 @@ Feature list:
 - snappy. We use a grunt build process which inlines all images, stylesheets, fonts and javascript into the html. This results in a single file download which is under 200kb compressed.
 - relatively secure. We use AES256 in CBC mode for our encryption and then use HMAC to sign the library. This makes it near impossible for any one to read or alter your password library without you noticing.
 - semi-decent filtering. Hit CTRL-E to filter your passwords, each token is matched independently in title and comment.
-- automatic logout. After 10 seconds of idling, you log out automatically.
+- automatic logout. After 20 seconds of idling, you log out automatically.
 - safe from people looking over your shoulder. You can copy user names and passwords without revealing them or their length, just click to select.
 
 Coming soon:

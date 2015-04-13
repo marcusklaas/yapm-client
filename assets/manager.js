@@ -1,7 +1,8 @@
-crypto = crypto || window.msCrypto;
-downloadUrl = 'encrypted/passwords.txt?noCache=' + Math.floor(Math.random() * 1e6);
-uploadUrl = 'libupdate.php';
-maxIdleTime = 10; // seconds
+var crypto = crypto || window.msCrypto;
+var downloadUrl = 'encrypted/passwords.txt?noCache=' + Math.floor(Math.random() * 1e6);
+var uploadUrl = 'libupdate.php';
+var maxIdleTime = 20; // seconds
+var alert = window.alert;
 
 // encode num in little endian format
 function encodeIvFromNumber(num) {
@@ -19,13 +20,13 @@ function encodeIvFromNumber(num) {
 }
 
 function stringToArrayBuffer(string) {
-    let encoder = new TextEncoder("utf-8");
+    let encoder = new window.TextEncoder("utf-8");
 
     return encoder.encode(string);
 }
 
 function arrayBufferToString(array) {
-    let decoder = new TextDecoder("utf-8");
+    let decoder = new window.TextDecoder("utf-8");
 
     return decoder.decode(array);
 }
@@ -64,7 +65,6 @@ function arrayBufferToHexString(arrayBuffer) {
 }
 
 function getAsync(url) {
-    // Return a new promise.
     return new Promise(function(resolve, reject) {
         let request = new XMLHttpRequest();
         request.open('GET', url);
@@ -562,13 +562,13 @@ window.onload = function() {
     function deletePassword(evt) {
         evt.preventDefault();
 
-        if ( ! confirm("Are you totally sure you want to delete this password?")) {
+        if ( ! window.confirm("Are you totally sure you want to delete this password?")) {
             return;
         }
 
         let i = 0, row = this.parentNode.parentNode;
 
-        for (child = row; (child = child.previousSibling) != null; i++);
+        for (let child = row; (child = child.previousSibling) != null; i++);
 
         list.splice(i, 1);
         row.parentNode.removeChild(row);
@@ -588,7 +588,7 @@ window.onload = function() {
         let row = this.parentNode.parentNode;
         let i = 0;
 
-        for (child = row; (child = child.previousSibling) !== null; i++);
+        for (let child = row; (child = child.previousSibling) !== null; i++);
 
         editDialog(i);
     }
@@ -633,6 +633,7 @@ window.onload = function() {
 
     function displayList(passwordList) {
         let tableBody = document.getElementById('overview').lastChild;
+        tableBody.innerHTML = '';
 
         for (let i = 0; i < passwordList.length; i++) {
             addRow(tableBody, passwordList[i]);
@@ -684,12 +685,16 @@ window.onload = function() {
 
     if (false /* offline mode */) {
         let buttons = document.getElementsByClassName('newPassword');
-        for (let i = 0; i < buttons.length; i++)
-            buttons[i].parentNode.removeChild(button);
+        for (let i = 0; i < buttons.length; i++) {
+            let button = buttons[i];
+            button.parentNode.removeChild(button);
+        }
 
         buttons = document.getElementsByClassName('newMasterKey');
-        for (let i = 0; i < buttons.length; i++)
-            buttons[i].parentNode.removeChild(button);
+        for (let i = 0; i < buttons.length; i++) {
+            let button = buttons[i];
+            button.parentNode.removeChild(button);
+        }
     }
     else {
         function newPW(evt) {
@@ -714,7 +719,7 @@ window.onload = function() {
         document.getElementById('saveKey').addEventListener('click', evt => {
             evt.preventDefault();
 
-            if ( ! confirm('Are you sure you want to change the master key?')) {
+            if ( ! window.confirm('Are you sure you want to change the master key?')) {
                 return closeDialog();
             }
 

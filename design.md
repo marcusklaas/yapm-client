@@ -1,4 +1,5 @@
 TODO: move to github wiki
+TODO: This is no longer correct! The current implementation is similar, but not exactly as described below.
 
 This is a brief outline of the new design.
 

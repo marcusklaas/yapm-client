@@ -20,7 +20,7 @@ Coming soon:
 - responsive design. Should make it easier to use on mobile devices.
 - offline mode. Caches the page and a version of the password library in case you are without internet.
 
-# Please note: just as with any other password manager, there are still some security risks. Think of key loggers, or some one changing the client code on the server. More fundamentally, you need to trust your browser and machine in general.
+*Note*: just as with any other password manager, there are still some security risks. Think of key loggers, or some one changing the client code on the server. More fundamentally, you need to trust your browser and machine in general.
 
 Getting started
 ===============

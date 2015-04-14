@@ -409,7 +409,7 @@ window.onload = function() {
     let hmacKey = null;
     let aesKey = null;
     let libraryVersion = null;
-    let downloadPromise = getAsync(downloadUrl);
+    let downloadPromise = getAsync(downloadUrl).then(raw => JSON.parse(raw));
 
     function decodeListAndShow(password) {
         getSha1(password).then(hash => {
@@ -429,16 +429,12 @@ window.onload = function() {
         });
 
         let libraryPromise = Promise.all([downloadPromise, hmacKeyPromise])
-            .then(([libraryJson, key]) => {
-                const library = JSON.parse(libraryJson);
-
-                return verifyHmac(key, library.library, library.hmac)
-                    .then(() => library.library);
-            });
+            .then(([library, key]) => verifyHmac(key, library.library, library.hmac).then(() => library.library));
 
         libraryPromise.then(library => {
             libraryVersion = library.library_version;
         });
+
         let passwordListPromise = Promise
             .all([aesKeyPromise, libraryPromise])
             .then(([key, library]) => decryptLibrary(key, library));
@@ -669,6 +665,8 @@ window.onload = function() {
                     library: library,
                     hmac:hmac
                 };
+
+                downloadPromise = downloadPromise.then(() => signedLib);
 
                 return postLibraryAsync(uploadUrl, signedLib, passwordHash, newHash);
             });

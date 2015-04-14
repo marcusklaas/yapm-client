@@ -11,6 +11,7 @@
     "grunt-contrib-uglify": "^0.9.1",
     "grunt-es6-transpiler": "^1.0.2",
     "grunt-inline-alt": "^0.3.4",
+    "grunt-manifest": "^0.4.0",
     "grunt-processhtml": "^0.3.7",
     "grunt-uncss": "^0.4.2"
   }

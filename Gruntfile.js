@@ -57,6 +57,27 @@ module.exports = function(grunt) {
                     'index.html': 'assets/index-inlined.html'
                 }
             }
+        },
+
+        manifest: {
+            generate: {
+                options: {
+                    basePath: './',
+                    cache: [],
+                    network: ['http://*', 'https://*'],
+                    fallback: [],
+                    exclude: [],
+                    preferOnline: true,
+                    verbose: false,
+                    timestamp: true,
+                    hash: false,
+                    master: ['index.html']
+                },
+                src: [
+                    'index.html'
+                ],
+                dest: 'manifest.appcache'
+            }
         }
     });
 
@@ -66,6 +87,7 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks('grunt-es6-transpiler');
     grunt.loadNpmTasks('grunt-contrib-uglify');
     grunt.loadNpmTasks('grunt-contrib-htmlmin');
+    grunt.loadNpmTasks('grunt-manifest');
 
     // Default task(s).
     grunt.registerTask('default', [
@@ -74,7 +96,8 @@ module.exports = function(grunt) {
         'uncss',
         'processhtml',
         'inline',
-        'htmlmin'
+        'htmlmin',
+        'manifest'
     ]);
 
 };

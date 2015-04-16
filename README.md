@@ -15,10 +15,10 @@ Feature list:
 - semi-decent filtering. Hit CTRL-E to filter your passwords, each token is matched independently in title and comment.
 - automatic logout. After 20 seconds of idling, you log out automatically.
 - safe from people looking over your shoulder. You can copy user names and passwords without revealing them or their length, just click to select.
+- offline mode. Caches the page and a version of the password library in case you are without internet.
 
 Coming soon:
 - responsive design. Should make it easier to use on mobile devices.
-- offline mode. Caches the page and a version of the password library in case you are without internet.
 
 *Note*: just as with any other password manager, there are still some security risks. Think of key loggers, or some one changing the client code on the server. More fundamentally, you need to trust your browser and machine in general.
 
@@ -31,7 +31,7 @@ Getting started
 - Login to the password manager and log in with the default password `changeme`.
 - Change your master password by pressing the button in the top right.
 
-Building process
+Build process
 ================
 
 Coming soon.

@@ -1,8 +1,23 @@
-var crypto = crypto || window.msCrypto;
-var downloadUrl = 'encrypted/passwords.txt?noCache=' + Math.floor(Math.random() * 1e6);
-var uploadUrl = 'libupdate.php';
-var maxIdleTime = 20; // seconds
-var alert = window.alert;
+const crypto = crypto || window.msCrypto;
+const downloadUrl = 'encrypted/passwords.txt?noCache=' + Math.floor(Math.random() * 1e6);
+const uploadUrl = 'libupdate.php';
+const maxIdleTime = 20; // seconds
+const alert = window.alert;
+var offlineMode = false;
+
+// start download as early as possible
+let downloadPromise = getAsync(downloadUrl)
+    .catch(() => new Promise((resolve, reject) => {
+        const cachedLibrary = window.localStorage.getItem('password-library');
+
+        if ( ! cachedLibrary) {
+            return reject(new Error('Couldn\'t download library and there was no cached version'));
+        }
+
+        offlineMode = true;
+        resolve(cachedLibrary);
+    }))
+    .then(raw => JSON.parse(raw));
 
 // encode num in little endian format
 function encodeIvFromNumber(num) {
@@ -404,12 +419,11 @@ window.onload = function() {
     });
 
     let idleTime = 0;
-    let list = null;
+    let passwordList = null;
     let passwordHash = null;
     let hmacKey = null;
     let aesKey = null;
     let libraryVersion = null;
-    let downloadPromise = getAsync(downloadUrl).then(raw => JSON.parse(raw));
 
     function decodeListAndShow(password) {
         getSha1(password).then(hash => {
@@ -435,15 +449,19 @@ window.onload = function() {
             libraryVersion = library.library_version;
         });
 
+        Promise.all([downloadPromise, libraryPromise]).then(([library, _]) => {
+            window.localStorage.setItem('password-library', JSON.stringify(library));
+        });
+
         let passwordListPromise = Promise
             .all([aesKeyPromise, libraryPromise])
             .then(([key, library]) => decryptLibrary(key, library));
 
         passwordListPromise
-            .then(passwordList => {
-                list = passwordList;
+            .then(passwords => {
+                passwordList = passwords;
 
-                displayList(passwordList);
+                displayList(passwords);
 
                 document.getElementById('authorized').className = '';
                 document.getElementById('unauthorized').className = 'hidden';
@@ -496,12 +514,12 @@ window.onload = function() {
         document.getElementById('editModal').classList.remove('hidden');
         document.getElementById('editModal').setAttribute('data-index', index);
         document.getElementById('modalHeader').innerHTML = (index === -1) ? 'New password' : 'Edit password';
-        document.getElementById('title').value = (index === -1) ? '' : list[index].title;
-        document.getElementById('URL').value = (index === -1) ? '' : list[index].url;
-        document.getElementById('username').value = (index === -1) ? '' : list[index].username;
+        document.getElementById('title').value = (index === -1) ? '' : passwordList[index].title;
+        document.getElementById('URL').value = (index === -1) ? '' : passwordList[index].url;
+        document.getElementById('username').value = (index === -1) ? '' : passwordList[index].username;
         document.getElementById('pass').value = document.getElementById('passRepeat').value =
-            (index === -1) ? '' : list[index].password;
-        document.getElementById('comment').value = (index === -1) ? '' : list[index].comment;
+            (index === -1) ? '' : passwordList[index].password;
+        document.getElementById('comment').value = (index === -1) ? '' : passwordList[index].comment;
     }
 
     document.getElementById('editModal').addEventListener('click', closeDialog);
@@ -525,13 +543,13 @@ window.onload = function() {
         }
 
         if (index === -1) {
-            list.push(pwdEntry);
+            passwordList.push(pwdEntry);
             addRow(document.getElementById('overview').lastChild, pwdEntry);
 
             filterPasswords(document.getElementById('filter').value);
         }
         else {
-            list[index] = pwdEntry;
+            passwordList[index] = pwdEntry;
 
             let node = document.getElementById('overview').lastChild.firstChild;
             while (index--) {
@@ -548,9 +566,7 @@ window.onload = function() {
             node.nextSibling.innerHTML = pwdEntry.comment;
         }
 
-        sendUpdate()
-            .then(() => console.log('Successfully updated library!'))
-            .catch(e => alert('Failed updating library: ' + e.message));
+        sendUpdate().catch(e => alert('Failed updating library: ' + e.message));
 
         closeDialog();
     });
@@ -566,7 +582,7 @@ window.onload = function() {
 
         for (let child = row; (child = child.previousSibling) != null; i++);
 
-        list.splice(i, 1);
+        passwordList.splice(i, 1);
         row.parentNode.removeChild(row);
         sendUpdate();
     }
@@ -576,7 +592,7 @@ window.onload = function() {
         let currentVisibility = row.className == 'exposed';
 
         row.className = currentVisibility ? '' : 'exposed';
-        this.innerHTML = currentVisibility ? '<i class="icon-eye-open"></i>' : '<i class="icon-eye-close"></i>';
+        this.innerHTML = currentVisibility ? '<i class="icon-eye"></i>' : '<i class="icon-eye-off"></i>';
         evt.preventDefault();
     }
 
@@ -594,11 +610,11 @@ window.onload = function() {
         let link = document.createElement('a');
         link.href = '#';
         link.className = 'toggleVisibility';
-        link.innerHTML = '<i class="icon-eye-open"></i>';
+        link.innerHTML = '<i class="icon-eye"></i>';
         link.addEventListener('click', toggleVisibility);
         node.appendChild(link);
 
-        if (true /* false === offlineMode */) {
+        if (! offlineMode) {
             link = document.createElement('a');
             link.href = '#';
             link.className = 'editPassword';
@@ -627,17 +643,17 @@ window.onload = function() {
         tbody.appendChild(row);
     }
 
-    function displayList(passwordList) {
+    function displayList(passwords) {
         let tableBody = document.getElementById('overview').lastChild;
         tableBody.innerHTML = '';
 
-        for (let i = 0; i < passwordList.length; i++) {
-            addRow(tableBody, passwordList[i]);
+        for (let password of passwords) {
+            addRow(tableBody, password);
         }
     }
 
     function logout() {
-        list = null;
+        passwordList = null;
         hmacKey = null;
         aesKey = null;
         passwordHash = null;
@@ -655,7 +671,7 @@ window.onload = function() {
     function sendUpdate(newHash) {
         libraryVersion += 1;
 
-        let blobPromise = encryptObject(aesKey, list, libraryVersion);
+        let blobPromise = encryptObject(aesKey, passwordList, libraryVersion);
         let libraryPromise = blobPromise.then(blob => createLibrary(blob, libraryVersion, 2 /* api version */));
         let hmacPromise = libraryPromise.then(library => getObjectHmac(hmacKey, library));
 
@@ -667,6 +683,7 @@ window.onload = function() {
                 };
 
                 downloadPromise = downloadPromise.then(() => signedLib);
+                window.localStorage.setItem('password-library', JSON.stringify(signedLib));
 
                 return postLibraryAsync(uploadUrl, signedLib, passwordHash, newHash);
             });
@@ -681,7 +698,7 @@ window.onload = function() {
         evt.preventDefault();
     });
 
-    if (false /* offline mode */) {
+    if (offlineMode) {
         let buttons = document.getElementsByClassName('newPassword');
         for (let i = 0; i < buttons.length; i++) {
             let button = buttons[i];
@@ -746,16 +763,13 @@ window.onload = function() {
                 });
 
             updatePromise
-                .then(() => {
-                    closeDialog();
-                    console.log('Password update is a success!');
-                })
+                .then(closeDialog)
                 .catch(e => alert('Failed updating password: ' + e.message));
         });
     }
 
     function filterPasswords(val) {
-        doFilter(list, val);
+        doFilter(passwordList, val);
     }
 
     document.getElementById('filter').addEventListener('keyup', function(evt) {

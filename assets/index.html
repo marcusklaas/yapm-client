@@ -6,10 +6,14 @@
     <title>Passwords</title>
     <link rel="icon" type="image/png" href="favicon.png" />
 
+    <!-- build:js manager.min.js -->
+    <script src="manager.js" type="application/javascript;version=1.8"></script>
+    <!-- /build -->
+
     <!-- build:css tidy.css -->
     <link rel="stylesheet" type="text/css" href="style.css" />
     <link rel="stylesheet" type="text/css" href="bootstrap.css" />
-    <link rel="stylesheet" type="text/css" href="font-awesome.css" />
+    <link rel="stylesheet" type="text/css" href="yapm.css" />
     <!-- /build -->
 </head>
 
@@ -21,7 +25,7 @@
 
         <form id="decrypt" class="well form-inline" autocomplete="off">
             <input type="password" id="encryptionKey" placeholder="master-key" class="form-control">
-            <button class="btn"><i class="icon-key"></i> Decrypt</button>
+            <button class="btn"><i class="icon-lock-open"></i> Decrypt</button>
         </form>
 
         <h2 id="testPhrase">Do not login!</h2>
@@ -76,7 +80,7 @@
                     <td><div class="obscured">Dummy</div></td>
                     <td><table class="comment">Dummy</table></td><td>Dummy</td>
                     <td>
-                        <a class="toggleVisibility"><i class="icon-eye-open"></i></a>
+                        <a class="toggleVisibility"><i class="icon-eye"></i></a>
                         <a class="editPassword"><i class="icon-edit"></i></a>
                         <a class="deletePassword"><i class="icon-trash"></i></a>
                     </td>
@@ -141,8 +145,8 @@
     </form>
 
     <div class="modal-footer">
-        <a href="#" class="btn btn-default" id="randPass"><i class="icon-random"></i> Random Password</a>
-        <a href="#" class="btn btn-primary" id="save"><i class="icon-save"></i> Save</a>
+        <a href="#" class="btn btn-default" id="randPass"><i class="icon-shuffle"></i> Random Password</a>
+        <a href="#" class="btn btn-primary" id="save"><i class="icon-floppy"></i> Save</a>
     </div>
 
     </div><!-- /.modal-content -->
@@ -176,7 +180,7 @@
     </form>
 
     <div class="modal-footer">
-        <a href="#" class="btn btn-primary" id="saveKey"><i class="icon-warning-sign"></i> Save</a>
+        <a href="#" class="btn btn-primary" id="saveKey"><i class="icon-attention"></i> Save</a>
     </div>
 
     </div><!-- /.modal-content -->
@@ -184,10 +188,6 @@
     </div><!-- /.modal -->
 
 </section>
-
-<!-- build:js manager.min.js -->
-<script src="manager.js" type="application/javascript;version=1.8"></script>
-<!-- /build -->
 
 </body>
 

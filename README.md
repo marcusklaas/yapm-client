@@ -10,7 +10,7 @@ PHP should have write access for the encrypted folder, your HTTP server should h
 Feature list:
 - access to all your passwords from any machine with an internet connection!
 - low code complexity. All the code client is contained within `assets/manager.js` with no dependencies on other libraries. The web cryptography API is used for speed and reliability.
-- snappy. We use a grunt build process which inlines all images, stylesheets, fonts and javascript into the html. This results in a single file download which is under 200kb compressed.
+- snappy. We use a grunt build process which inlines all images, stylesheets, fonts and javascript into the html. This results in a single file download which is under 50 Kb compressed.
 - relatively secure. We use AES256 in CBC mode for our encryption and then use HMAC to sign the library. This makes it near impossible for any one to read or alter your password library without you noticing.
 - semi-decent filtering. Hit CTRL-E to filter your passwords, each token is matched independently in title and comment.
 - automatic logout. After 20 seconds of idling, you log out automatically.
@@ -30,3 +30,17 @@ Getting started
 - Set the permissions: `$ chmod 777 encrypted/* encrypted && chmod 555 index.html libupdate.php` 
 - Login to the password manager and log in with the default password `changeme`.
 - Change your master password by pressing the button in the top right.
+
+Building process
+================
+
+Coming soon.
+
+Words of gratitude
+==================
+
+Thanks to
+
+- [svgeneration](http://www.svgeneration.com) for the bad-ass vector graphics background;
+- [fontello](http://www.fontello.com) for the subset of font-awesome icons;
+- [twitter bootstrap](http://getbootstrap.com/) for the stylesheet framework.

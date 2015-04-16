@@ -1,0 +1,14 @@
+CACHE MANIFEST
+# Time: Thu Apr 16 2015 02:11:33 GMT+0200 (CEST)
+
+CACHE:
+index.html
+
+NETWORK:
+http://*
+https://*
+
+FALLBACK:
+
+SETTINGS:
+prefer-online

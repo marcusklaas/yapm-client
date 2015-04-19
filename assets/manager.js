@@ -1,4 +1,7 @@
-const crypto = crypto || window.msCrypto;
+import { getSha1, verifyHmac, getHmacKey, getAesKey, encryptObject, getObjectHmac, decryptStringFromBase64 } from './crypto';
+import { postAsync, getAsync } from './network';
+
+const crypto = window.crypto || window.msCrypto;
 const downloadUrl = 'encrypted/passwords.txt?noCache=' + Math.floor(Math.random() * 1e6);
 const uploadUrl = 'libupdate.php';
 const maxIdleTime = 20; // seconds
@@ -18,126 +21,6 @@ let downloadPromise = getAsync(downloadUrl)
         resolve(cachedLibrary);
     }))
     .then(raw => JSON.parse(raw));
-
-// encode num in little endian format
-function encodeIvFromNumber(num) {
-    // iv is 16 bytes long
-    let iv = new Uint8Array(16);
-
-    // support num up to 8 bytes long
-    for(let i = 0; i < 8; i++) {
-        iv[i] = num & 255;
-
-        num = num >>> 8;
-    }
-
-    return iv;
-}
-
-function stringToArrayBuffer(string) {
-    let encoder = new window.TextEncoder("utf-8");
-
-    return encoder.encode(string);
-}
-
-function arrayBufferToString(array) {
-    let decoder = new window.TextDecoder("utf-8");
-
-    return decoder.decode(array);
-}
-
-function bufferViewToArray(buffer) {
-    const array = new Uint8Array(buffer);
-    let list = [];
-
-    for(let i = 0; i < array.length; i++) {
-        list[i] = array[i];
-    }
-
-    return list;
-}
-
-function bufferViewToBase64(buffer) {
-    let list = bufferViewToArray(buffer);
-
-    return btoa(list);
-}
-
-function arrayBufferToHexString(arrayBuffer) {
-    let byteArray = new Uint8Array(arrayBuffer);
-    let hexString = "";
-    let nextHexByte;
-
-    for (let i = 0; i < byteArray.byteLength; i++) {
-        nextHexByte = byteArray[i].toString(16);
-        if (nextHexByte.length < 2) {
-            nextHexByte = "0" + nextHexByte;
-        }
-        hexString += nextHexByte;
-    }
-
-    return hexString;
-}
-
-function getAsync(url) {
-    return new Promise(function(resolve, reject) {
-        let request = new XMLHttpRequest();
-        request.open('GET', url);
-
-        request.onload = function() {
-            if (request.status == 200) {
-                resolve(request.response);
-            }
-            else {
-                reject(Error(request.statusText));
-            }
-        };
-
-        request.onerror = function() {
-            reject(Error("Network Error"));
-        };
-
-        request.send();
-    });
-}
-
-/**
- * @param url     string
- * @param library object
- * @param hash    string
- * @param newHash string
- * @returns Promise
- */
-function postLibraryAsync(url, library, hash, newHash) {
-    let params = 'pwhash=' + hash + '&newlib=' + encodeURIComponent(JSON.stringify(library));
-
-    if (newHash) {
-        params += `&newhash=${newHash}`;
-    }
-
-    return postAsync(url, params);
-}
-
-function postAsync(url, params) {
-    return new Promise(function(resolve, reject) {
-        let request = new XMLHttpRequest();
-
-        request.onreadystatechange = function() {
-            if(this.readyState === 4) {
-                if(this.status !== 200 || this.responseText !== 'success') {
-                    reject(Error(this));
-                }
-                else {
-                    resolve();
-                }
-            }
-        };
-
-        request.open('POST', url, true);
-        request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
-        request.send(params);
-    });
-}
 
 function PasswordEntry() {
     this.title = 'unnamed';
@@ -246,70 +129,20 @@ function doFilter(list, val) {
 }
 
 /**
- * @param password string
+ * @param url     string
+ * @param library object
+ * @param hash    string
+ * @param newHash string
  * @returns Promise
  */
-function getSha1(password) {
-    return crypto.subtle.digest(
-        {
-            name: "SHA-1"
-        },
-        stringToArrayBuffer(password)
-    )
-    .then(uintArray => arrayBufferToHexString(uintArray));
-}
+function postLibraryAsync(url, library, hash, newHash) {
+    let params = 'pwhash=' + hash + '&newlib=' + encodeURIComponent(JSON.stringify(library));
 
-/**
- * @param password string
- * @returns Promise
- */
-function getAesKey(password) {
-    return crypto.subtle.importKey(
-        "raw",
-        stringToArrayBuffer(password),
-        {
-            "name": "PBKDF2"
-        },
-        false,
-        ["deriveKey"]
-    )
-    .then(baseKey =>
-        crypto.subtle.deriveKey(
-            {
-                "name": "PBKDF2",
-                "salt": new Uint8Array(16),
-                "iterations": 4096,
-                "hash": {
-                    name: "SHA-1"
-                }
-            },
-            baseKey,
-            {
-                "name": "AES-CBC",
-                "length": 256
-            },
-            false,
-            ["encrypt", "decrypt"]
-        )
-    );
-}
+    if (newHash) {
+        params += `&newhash=${newHash}`;
+    }
 
-/**
- * @param key     KeyObject
- * @param obj     object
- * @param version int
- * @returns Promise
- */
-function encryptObject(key, obj, version) {
-    return crypto.subtle.encrypt(
-        {
-            name: "AES-CBC",
-            iv: encodeIvFromNumber(version)
-        },
-        key,
-        stringToArrayBuffer(JSON.stringify(obj))
-    )
-    .then(result => bufferViewToBase64(result));
+    return postAsync(url, params);
 }
 
 /**
@@ -327,75 +160,8 @@ function createLibrary(blob, libraryVersion, apiVersion) {
     };
 }
 
-/**
- * @param password string
- * @returns Promise
- */
-function getHmacKey(password) {
-    return crypto.subtle.importKey(
-        "raw",
-        stringToArrayBuffer(password),
-        {
-            name: "HMAC",
-            hash: {
-                name: "SHA-256"
-            }
-        },
-        false,
-        ["sign", "verify"]
-    );
-}
-
-/**
- * @param key HmacKey
- * @param obj object
- * @returns Promise containing string (base64 encoding)
- */
-function getObjectHmac(key, obj) {
-    return crypto.subtle.sign(
-        {
-            name: "HMAC"
-        },
-        key,
-        stringToArrayBuffer(JSON.stringify(obj))
-    )
-    .then(signature => bufferViewToBase64(signature));
-}
-
-/**
- * @param key  HmacKey
- * @param obj  obj
- * @param hmac string (base64 encoding)
- * @returns Promise
- */
-function verifyHmac(key, obj, hmac) {
-    const decodedHmac = atob(hmac);
-
-    return crypto.subtle.verify(
-        {
-            name: "HMAC"
-        },
-        key,
-        stringToArrayBuffer(decodedHmac),
-        stringToArrayBuffer(JSON.stringify(obj))
-    );
-}
-
 function decryptLibrary(key, library) {
-    const blob = library.blob;
-    const cryptoText = atob(blob);
-    const rawCryptoBytes = cryptoText.split(',').map(function (int) { return parseInt(int); }); // FIXME: this could probably be done more efficiently
-    const byteArray = new Uint8Array(rawCryptoBytes);
-
-    return crypto.subtle.decrypt(
-        {
-            name: "AES-CBC",
-            iv: encodeIvFromNumber(library.library_version)
-        },
-        key,
-        byteArray
-    )
-    .then(plainText => JSON.parse(arrayBufferToString(plainText)));
+    return decryptStringFromBase64(key, library.library_version, library.blob);
 }
 
 // TODO: rebuild offline mode
@@ -443,19 +209,23 @@ window.onload = function() {
         });
 
         let libraryPromise = Promise.all([downloadPromise, hmacKeyPromise])
-            .then(([library, key]) => verifyHmac(key, library.library, library.hmac).then(() => library.library));
+            .then(params => {
+                let [library, key] = params;
+
+                return verifyHmac(key, library.library, library.hmac).then(() => library.library);
+            });
 
         libraryPromise.then(library => {
             libraryVersion = library.library_version;
         });
 
-        Promise.all([downloadPromise, libraryPromise]).then(([library, _]) => {
-            window.localStorage.setItem('password-library', JSON.stringify(library));
-        });
+        Promise.all([downloadPromise, libraryPromise]).then(params =>
+            window.localStorage.setItem('password-library', JSON.stringify(params[0]))
+        );
 
         let passwordListPromise = Promise
             .all([aesKeyPromise, libraryPromise])
-            .then(([key, library]) => decryptLibrary(key, library));
+            .then(params => decryptLibrary(params[0], params[1]));
 
         passwordListPromise
             .then(passwords => {
@@ -676,7 +446,8 @@ window.onload = function() {
         let hmacPromise = libraryPromise.then(library => getObjectHmac(hmacKey, library));
 
         return Promise.all([libraryPromise, hmacPromise])
-            .then(([library, hmac]) => {
+            .then(params => {
+                const [library, hmac] = params;
                 const signedLib = {
                     library: library,
                     hmac:hmac
@@ -750,7 +521,9 @@ window.onload = function() {
             let hashPromise = getSha1(newKey);
 
             let updatePromise = Promise.all([hmacKeyPromise, aesKeyPromise, hashPromise])
-                .then(([newHmacKey, newAesKey, newHash]) => {
+                .then(params => {
+                    const [newHmacKey, newAesKey, newHash] = params;
+
                     hmacKey = newHmacKey;
                     aesKey = newAesKey;
 
@@ -758,8 +531,8 @@ window.onload = function() {
                 });
 
             Promise.all([updatePromise, hashPromise])
-                .then(([_, newHash]) => {
-                    passwordHash = newHash;
+                .then(params => {
+                    passwordHash = params[1];
                 });
 
             updatePromise

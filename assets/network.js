@@ -1,33 +1,26 @@
 export function getAsync(url) {
-    return new Promise(function(resolve, reject) {
-        let request = new XMLHttpRequest();
-
-        request.onload = function() {
-            if (request.status == 200) {
-                resolve(request.response);
-            }
-            else {
-                reject(Error(request.statusText));
-            }
-        };
-
-        request.onerror = function() {
-            reject(Error("Network Error"));
-        };
-
-        request.open('GET', url);
-        request.send();
-    });
+    return ajaxAsync(url, 'GET', {});
 }
 
 export function postAsync(url, params) {
+    return ajaxAsync(
+        url,
+        'POST',
+        {
+            'Content-type': 'application/x-www-form-urlencoded'
+        },
+        params
+    );
+}
+
+function ajaxAsync(url, method, requestHeaders, params) {
     return new Promise(function(resolve, reject) {
         let request = new XMLHttpRequest();
 
         request.onreadystatechange = function() {
             if(this.readyState === 4) {
                 if(this.status !== 200) {
-                    reject(Error(this));
+                    reject(request.response);
                 }
                 else {
                     resolve();
@@ -35,8 +28,11 @@ export function postAsync(url, params) {
             }
         };
 
-        request.open('POST', url, true);
-        request.setRequestHeader('Content-type', 'application/x-www-form-urlencoded');
+        for (let key in requestHeaders) {
+            request.setRequestHeader(key, requestHeaders[key]);
+        }
+
+        request.open(method, url, true);
         request.send(params);
     });
 }

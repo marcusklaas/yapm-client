@@ -1,5 +1,89 @@
 const crypto = window.crypto || window.msCrypto;
 
+// TODO: add crypto/ textDecoder checks
+
+export function createCryptoManager(password, library) {
+    let hmacKeyPromise = getHmacKey(password);
+    let aesKeyPromise = getAesKey(password);
+    let hashPromise = getSha1(password);
+
+    let libraryPromise = hmacKeyPromise
+        .then(key => verifyHmac(key, library.library, library.hmac).then(() => library.library));
+
+    let libraryVersionPromise = libraryPromise.then(library => library.library_version);
+
+    /**
+     * @param blob           string
+     * @param libraryVersion int
+     * @param apiVersion     int
+     * @returns object
+     */
+    function createLibrary(blob, libraryVersion, apiVersion) {
+        return {
+            blob: blob,
+            library_version: libraryVersion,
+            api_version: apiVersion,
+            modified: Math.round(new Date().getTime() / 1000)
+        };
+    }
+
+    return {
+        // FIXME: should this be here? It should only be called once. the list manager should supply the password list
+        getPasswordList: function() {
+            return Promise
+                .all([aesKeyPromise, libraryPromise])
+                .then(params => {
+                    let [key, library] = params;
+
+                    return decryptStringFromBase64(key, library.library_version, library.blob);
+                });
+        },
+        encryptPasswordList: function(passwordList, newKey) {
+            libraryVersionPromise = libraryVersionPromise.then(libraryVersion => libraryVersion + 1);
+
+            if (newKey) {
+                hmacKeyPromise = getHmacKey(newKey);
+                aesKeyPromise = getAesKey(newKey);
+                hashPromise = getSha1(newKey);
+            }
+
+            let blobPromise = Promise.all([aesKeyPromise, libraryVersionPromise])
+                .then(params => encryptObject(params[0], passwordList, params[1]));
+
+            libraryPromise = Promise.all([blobPromise, libraryVersionPromise])
+                .then(params => createLibrary(params[0], params[1], 2 /* api version */));
+
+            let hmacPromise = Promise.all([hmacKeyPromise, libraryPromise])
+                .then(params => getObjectHmac(params[0], params[1]));
+
+            return Promise.all([libraryPromise, hmacPromise])
+                .then(params => {
+                    return {
+                        library: params[0],
+                        hmac: params[1]
+                    };
+                });
+        },
+        getHash: function() {
+            return hashPromise;
+        }
+    };
+}
+
+export function generateRandomPassword(length, alphabet) {
+    let result = '';
+    let passwordLength = length || 16;
+    let actualAlphabet = alphabet || 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?:;[]~!@#$%^&*()-+/';
+    let alphabetLength = actualAlphabet.length;
+
+    for (let i = 0; i < passwordLength; i++) {
+        let index = Math.floor(Math.random() * alphabetLength);
+        result += actualAlphabet[index];
+    }
+
+    return result;
+}
+
 // encode num in little endian format
 function encodeIvFromNumber(num) {
     // iv is 16 bytes long
@@ -60,7 +144,7 @@ function arrayBufferToHexString(arrayBuffer) {
     return hexString;
 }
 
-export function decryptStringFromBase64(key, version, blob) {
+function decryptStringFromBase64(key, version, blob) {
     const cryptoText = atob(blob);
     const rawCryptoBytes = cryptoText.split(',').map(function (int) { return parseInt(int); }); // FIXME: this could probably be done more efficiently
     const byteArray = new Uint8Array(rawCryptoBytes);
@@ -73,14 +157,14 @@ export function decryptStringFromBase64(key, version, blob) {
         key,
         byteArray
     )
-        .then(plainText => JSON.parse(arrayBufferToString(plainText)));
+    .then(plainText => JSON.parse(arrayBufferToString(plainText)));
 }
 
 /**
  * @param password string
  * @returns Promise
  */
-export function getSha1(password) {
+function getSha1(password) {
     return crypto.subtle.digest(
         {
             name: "SHA-1"
@@ -94,7 +178,7 @@ export function getSha1(password) {
  * @param password string
  * @returns Promise
  */
-export function getAesKey(password) {
+function getAesKey(password) {
     return crypto.subtle.importKey(
         "raw",
         stringToArrayBuffer(password),
@@ -131,7 +215,7 @@ export function getAesKey(password) {
  * @param version int
  * @returns Promise
  */
-export function encryptObject(key, obj, version) {
+function encryptObject(key, obj, version) {
     return crypto.subtle.encrypt(
         {
             name: "AES-CBC",
@@ -140,14 +224,14 @@ export function encryptObject(key, obj, version) {
         key,
         stringToArrayBuffer(JSON.stringify(obj))
     )
-        .then(result => bufferViewToBase64(result));
+    .then(result => bufferViewToBase64(result));
 }
 
 /**
  * @param password string
  * @returns Promise
  */
-export function getHmacKey(password) {
+function getHmacKey(password) {
     return crypto.subtle.importKey(
         "raw",
         stringToArrayBuffer(password),
@@ -167,7 +251,7 @@ export function getHmacKey(password) {
  * @param obj object
  * @returns Promise containing string (base64 encoding)
  */
-export function getObjectHmac(key, obj) {
+function getObjectHmac(key, obj) {
     return crypto.subtle.sign(
         {
             name: "HMAC"
@@ -175,7 +259,7 @@ export function getObjectHmac(key, obj) {
         key,
         stringToArrayBuffer(JSON.stringify(obj))
     )
-        .then(signature => bufferViewToBase64(signature));
+    .then(signature => bufferViewToBase64(signature));
 }
 
 /**
@@ -184,15 +268,13 @@ export function getObjectHmac(key, obj) {
  * @param hmac string (base64 encoding)
  * @returns Promise
  */
-export function verifyHmac(key, obj, hmac) {
-    const decodedHmac = atob(hmac);
-
+function verifyHmac(key, obj, hmac) {
     return crypto.subtle.verify(
         {
             name: "HMAC"
         },
         key,
-        stringToArrayBuffer(decodedHmac),
+        stringToArrayBuffer(atob(hmac)),
         stringToArrayBuffer(JSON.stringify(obj))
     );
 }

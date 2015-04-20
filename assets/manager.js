@@ -1,16 +1,17 @@
-import { getSha1, verifyHmac, getHmacKey, getAesKey, encryptObject, getObjectHmac, decryptStringFromBase64 } from './crypto';
+import { createCryptoManager, generateRandomPassword } from './crypto';
 import { postAsync, getAsync } from './network';
+import { getListManager } from './listManager';
 
-const crypto = window.crypto || window.msCrypto;
 const downloadUrl = 'encrypted/passwords.txt?noCache=' + Math.floor(Math.random() * 1e6);
 const uploadUrl = 'libupdate.php';
+const localStorageKey = 'password-library';
 const maxIdleTime = 20; // seconds
-var offlineMode = false;
+let offlineMode = false;
 
 // start download as early as possible
 let downloadPromise = getAsync(downloadUrl)
     .catch(() => new Promise((resolve, reject) => {
-        const cachedLibrary = window.localStorage.getItem('password-library');
+        const cachedLibrary = window.localStorage.getItem(localStorageKey);
 
         if ( ! cachedLibrary) {
             return reject(new Error('Couldn\'t download library and there was no cached version'));
@@ -20,200 +21,6 @@ let downloadPromise = getAsync(downloadUrl)
         resolve(cachedLibrary);
     }))
     .then(raw => JSON.parse(raw));
-
-// TODO: this should probably be moved to its own module
-function createCryptoManager(password, library) {
-    let hmacKeyPromise = getHmacKey(password);
-    let aesKeyPromise = getAesKey(password);
-    let hashPromise = getSha1(password);
-
-    let libraryPromise = hmacKeyPromise
-        .then(key => verifyHmac(key, library.library, library.hmac).then(() => library.library));
-
-    let libraryVersionPromise = libraryPromise.then(library => library.library_version);
-
-    // TODO: move this out of here
-    libraryPromise.then(params => window.localStorage.setItem('password-library', JSON.stringify(params[0])));
-
-    return {
-        // FIXME: should this be here? It should only be called once. the list manager should supply the password list
-        getPasswordList: function() {
-            return Promise
-                .all([aesKeyPromise, libraryPromise])
-                .then(params => {
-                    let [key, library] = params;
-
-                    return decryptStringFromBase64(key, library.library_version, library.blob);
-                });
-        },
-        encryptPasswordList: function(passwordList, newPassword) {
-            libraryVersionPromise = libraryVersionPromise.then(libraryVersion => libraryVersion + 1);
-
-            if (newPassword) {
-                // TODO: do some stuff, set new aeskey and such
-            }
-
-            let blobPromise = libraryVersionPromise.then(libraryVersion => encryptObject(aesKey, passwordList, libraryVersion));
-
-            libraryPromise = Promise.all([blobPromise, libraryVersionPromise])
-                .then(params => createLibrary(params[0], params[1], 2 /* api version */));
-
-            let hmacPromise = libraryPromise.then(library => getObjectHmac(hmacKey, library));
-
-            return Promise.all([libraryPromise, hmacPromise])
-                .then(params => {
-                    return {
-                        library: params[0],
-                        hmac: params[1]
-                    };
-                });
-        }
-    };
-}
-
-function createRenderer(isOffline) {
-    return function(passwordObject) {
-        let row = document.createElement('tr');
-        addLinkCell(row, passwordObject.url, passwordObject.title);
-        addObscuredCell(row, passwordObject.username);
-        addObscuredCell(row, passwordObject.password);
-        addComment(row, passwordObject.comment);
-        addLinks(row, isOffline);
-
-        return row;
-    };
-}
-
-// TODO: this should probably be moved to its own module
-// TODO: add hider/ unhider method?
-function getListManager(passwordList, tbody, passwordRenderer) {
-    function getIndex(row) {
-        let index = 0;
-
-        for (let child = row; child.previousSibling; child = child.previousSibling) {
-            index += 1;
-        }
-
-        return index;
-    }
-
-    function getRow(domObject) {
-        while (domObject.parentNode != tbody) {
-            domObject = domObject.parentNode;
-        }
-
-        return domObject;
-    }
-
-    let manager = {
-        add: function (passwordObject) {
-            let domObject = passwordRenderer(passwordObject);
-
-            tbody.appendChild(domObject);
-        },
-        get: function(domObject) {
-            let index = getIndex(domObject);
-
-            return passwordList[index];
-        },
-        set: function(domObject, passwordObject) {
-            // TODO: implement
-        },
-        remove: function(domObject) {
-
-        },
-        getIndex: getIndex,
-        // TODO: try to revise this function in a more functional style
-        filter: function(val) {
-            let row = tbody.firstChild, nextRow;
-            let len = passwordList.length;
-            let tokens = val.toLowerCase().split(' ');
-
-            for(let i = 0, k = 0; i < len; i++, row = nextRow) {
-                nextRow = row.nextSibling;
-
-                for(let j = 0; j < tokens.length; j++) {
-                    if(-1 === passwordList[k].title.toLowerCase().indexOf(tokens[j])
-                        && -1 === passwordList[k].comment.toLowerCase().indexOf(tokens[j])) {
-                        row.classList.add('hidden');
-
-                        /* place row at bottom of list */
-                        tbody.insertBefore(row, null);
-
-                        let tmp = passwordList[k];
-                        passwordList.splice(k, 1);
-                        passwordList[len - 1] = tmp;
-                        break;
-                    }
-
-                    row.classList.remove('hidden');
-                    k++;
-                }
-            }
-        }
-    };
-
-    tbody.innerHTML = '';
-
-    for (let password of passwordList) {
-        manager.add(password);
-    }
-
-    return manager;
-}
-
-function randPass(len, alphabet) {
-    let result = '';
-
-    if (!alphabet) {
-        alphabet = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'
-        + '.,?:;[]~!@#$%^&*()-+/';
-    }
-
-    let alphabetLength = alphabet.length;
-
-    if ((len === undefined) || isNaN(len) || len < 6) {
-        len = 12;
-    }
-
-    for (let i = 0; i < len; i++) {
-        let rnd = Math.floor(Math.random() * alphabetLength);
-        result += alphabet.substring(rnd, rnd + 1);
-    }
-
-    return result;
-}
-
-// TODO: maybe it's easier to just use raw html?
-function addLinks(row, offlineMode) {
-    let node = document.createElement('td');
-    let link = document.createElement('a');
-    link.href = '#';
-    link.classList.add('toggleVisibility');
-    link.innerHTML = '<i class="icon-eye"></i>';
-    link.addEventListener('click', toggleVisibility);
-    node.appendChild(link);
-
-    if (! offlineMode) {
-        link = document.createElement('a');
-        link.href = '#';
-        link.classList.add('editPassword');
-        link.innerHTML = '<i class="icon-edit"></i>';
-        link.addEventListener('click', function() {
-            editDialog(this);
-        });
-        node.appendChild(link);
-
-        link = document.createElement('a');
-        link.href = '#';
-        link.classList.add('deletePassword');
-        link.innerHTML = '<i class="icon-trash"></i>';
-        link.addEventListener('click', deletePassword);
-        node.appendChild(link);
-    }
-
-    row.appendChild(node);
-}
 
 function selectText() {
     if (document.selection) {
@@ -230,7 +37,7 @@ function selectText() {
 function addObscuredCell(row, text) {
     let node = document.createElement('td');
     let span = document.createElement('div');
-    span.className = 'obscured';
+    span.classList.add('obscured');
     span.innerHTML = text;
     span.addEventListener('click', selectText);
     node.appendChild(span);
@@ -252,7 +59,7 @@ function addComment(row, text) {
     let table = document.createElement('table');
     let tableRow = document.createElement('tr');
     let cell = document.createElement('td');
-    table.className = 'comment';
+    table.classList.add('comment');
     cell.innerHTML = text;
     tableRow.appendChild(cell);
     table.appendChild(tableRow);
@@ -268,89 +75,112 @@ function addComment(row, text) {
  * @returns Promise
  */
 function postLibraryAsync(url, library, hash, newHash) {
-    let params = 'pwhash=' + hash + '&newlib=' + encodeURIComponent(JSON.stringify(library));
-
-    if (newHash) {
-        params += `&newhash=${newHash}`;
-    }
+    const encodedLibrary = encodeURIComponent(JSON.stringify(library));
+    const params = `pwhash=${hash}&newlib=${encodedLibrary}&newhash=${newHash}`;
 
     return postAsync(url, params);
 }
 
-/**
- * @param blob           string
- * @param libraryVersion int
- * @param apiVersion     int
- * @returns object
- */
-function createLibrary(blob, libraryVersion, apiVersion) {
-    return {
-        blob: blob,
-        library_version: libraryVersion,
-        api_version: apiVersion,
-        modified: Math.round(new Date().getTime() / 1000)
-    };
-}
-
+/* filter shortcut: ctrl+e */
 function isFilterShortCut(event) {
     return event.ctrlKey && event.keyCode === 69;
 }
 
-// TODO: rebuild offline mode
+function isEscapeKey(event) {
+    return event.keyCode === 27;
+}
+
 window.onload = function() {
-    // Check that web crypto is even available
-    if (!crypto || !crypto.subtle) {
-        return window.alert("Your browser does not support the Web Cryptography API! This page will not work.");
-    }
-
-    if (!window.TextEncoder || !window.TextDecoder) {
-        return window.alert("Your browser does not support the Encoding API! This page will not work.");
-    }
-
     let listManager = null;
     let cryptoManager = null;
     let idleTime = 0;
 
     /* central definition of dom objects */
-    var $masterKeyInput = document.getElementById('encryptionKey');
-    var $filterInput = document.getElementById('filter');
-    var $titleInput = document.getElementById('title');
-    var $urlInput = document.getElementById('URL');
-    var $userNameInput = document.getElementById('username');
-    var $passwordInput = document.getElementById('pass');
-    var $passwordRepeatInput = document.getElementById('passRepeat');
-    var $commentInput = document.getElementById('comment');
-    var $newMasterKeyInput = document.getElementById('key');
-    var $newMasterKeyRepeatInput = document.getElementById('keyRepeat');
+    let $masterKeyInput = document.getElementById('encryptionKey');
+    let $filterInput = document.getElementById('filter');
+    let $titleInput = document.getElementById('title');
+    let $urlInput = document.getElementById('URL');
+    let $userNameInput = document.getElementById('username');
+    let $passwordInput = document.getElementById('pass');
+    let $passwordRepeatInput = document.getElementById('passRepeat');
+    let $commentInput = document.getElementById('comment');
+    let $newMasterKeyInput = document.getElementById('key');
+    let $newMasterKeyRepeatInput = document.getElementById('keyRepeat');
 
-    var $randomPasswordButton = document.getElementById('randPass');
-    var $decryptButton = document.getElementById('decrypt');
-    var $saveButton = document.getElementById('save');
-    var $saveMasterKeyButton = document.getElementById('saveKey');
-    var $modalCloseButtonOne = document.getElementById('modalClose1');
-    var $modalCloseButtonTwo = document.getElementById('modalClose2');
-    var $newPasswordButtonList = document.getElementsByClassName('newPassword');
-    var $newMasterKeyButtonList = document.getElementsByClassName('newMasterKey');
+    let $randomPasswordButton = document.getElementById('randPass');
+    let $saveButton = document.getElementById('save');
+    let $saveMasterKeyButton = document.getElementById('saveKey');
+    let $modalCloseButtonOne = document.getElementById('modalClose1');
+    let $modalCloseButtonTwo = document.getElementById('modalClose2');
+    let $newPasswordButtonList = document.getElementsByClassName('newPassword');
+    let $newMasterKeyButtonList = document.getElementsByClassName('newMasterKey');
 
-    var $tableBody = document.getElementById('overview').lastChild;
-    var $editModal = document.getElementById('editModal');
-    var $editModalHeader = document.getElementById('modalHeader');
-    var $masterKeyModal = document.getElementById('masterkeyModal');
-    var $authorizedSection = document.getElementById('authorized');
-    var $unauthorizedSection = document.getElementById('unauthorized');
+    let $decryptForm = document.getElementById('decrypt');
+    let $tableBody = document.getElementById('overview').lastChild;
+    let $editModal = document.getElementById('editModal');
+    let $editModalHeader = document.getElementById('modalHeader');
+    let $masterKeyModal = document.getElementById('masterkeyModal');
+    let $authorizedSection = document.getElementById('authorized');
+    let $unauthorizedSection = document.getElementById('unauthorized');
 
-    $decryptButton.addEventListener('submit', function (evt) {
+    $masterKeyInput.focus();
+    setInterval(incrementIdleTime, 1000);
+
+    $decryptForm.addEventListener('submit', decryptPage, false);
+    $saveButton.addEventListener('click', saveChanges);
+    $randomPasswordButton.addEventListener('click', setRandomPassword);
+    $editModal.addEventListener('click', closeDialog);
+    $masterKeyModal.addEventListener('click', closeDialog);
+    $modalCloseButtonOne.addEventListener('click', closeDialog);
+    $modalCloseButtonTwo.addEventListener('click', closeDialog);
+
+    $filterInput.addEventListener('keyup', filterList);
+    document.addEventListener('touchstart', resetIdleTime, false);
+    document.addEventListener('touchmove', resetIdleTime, false);
+    document.addEventListener('touchend', resetIdleTime, false);
+    document.addEventListener('keydown', checkKeyDown, false);
+    document.onmousemove = resetIdleTime;
+
+    // FIXME: maybe we should just set a css class somewhere and hide these properties in css
+    if (offlineMode) {
+        for(let button of $newPasswordButtonList) {
+            button.parentNode.removeChild(button);
+        }
+
+        for(let button of $newMasterKeyButtonList) {
+            button.parentNode.removeChild(button);
+        }
+    }
+    else {
+        for(let button of $newPasswordButtonList) {
+            button.addEventListener('click', newPW);
+        }
+
+        for(let button of $newMasterKeyButtonList) {
+            button.addEventListener('click', newMasterPW);
+        }
+
+        $saveMasterKeyButton.addEventListener('click', saveMasterKey);
+    }
+
+    function decryptPage(evt) {
         evt.preventDefault();
 
         const password = $masterKeyInput.value;
         $masterKeyInput.value = '';
 
-        downloadPromise.then(library => createCryptoManager(password, library))
+        let listPromise = downloadPromise
+            .then(library => createCryptoManager(password, library))
             .then(newManager => {
                 return cryptoManager = newManager;
             })
-            .then(newManager => newManager.getPasswordList())
-            .then(passwordList => getListManager(passwordList, createRenderer(offlineMode)))
+            .then(newManager => newManager.getPasswordList());
+
+        Promise.all([downloadPromise, listPromise])
+            .then(params => window.localStorage.setItem(localStorageKey, JSON.stringify(params[0])));
+
+        listPromise
+            .then(passwordList => getListManager(passwordList, $tableBody, createRenderer(offlineMode)))
             .then(newManager => {
                 listManager = newManager;
 
@@ -359,9 +189,9 @@ window.onload = function() {
                 $filterInput.focus();
             })
             .catch(error => window.alert('Something went wrong: ' + error.message));
-    });
 
-    $masterKeyInput.focus();
+        return false;
+    }
 
     function resetIdleTime() {
         idleTime = 0;
@@ -374,22 +204,17 @@ window.onload = function() {
         }
     }
 
-    setInterval(incrementIdleTime, 1000);
-
-    /* filter shortcut: ctrl+e */
-    document.addEventListener('keydown', function (evt) {
+    function checkKeyDown(evt) {
         resetIdleTime();
 
         if (isFilterShortCut(evt)) {
             evt.preventDefault();
             $filterInput.focus();
         }
-    }, false);
-
-    document.onmousemove = resetIdleTime;
-    document.addEventListener('touchstart', resetIdleTime, false);
-    document.addEventListener('touchmove', resetIdleTime, false);
-    document.addEventListener('touchend', resetIdleTime, false);
+        else if (isEscapeKey(evt)) {
+            closeDialog();
+        }
+    }
 
     function closeDialog(event) {
         if (event && event.target != this) {
@@ -402,33 +227,31 @@ window.onload = function() {
 
     /* undefined domObject means a new password */
     function editDialog(domObject) {
-        let password = listManager.get(domObject);
-        let index = domObject ? listManager.getIndex(domObject) : -1;
+        const isNew = typeof domObject == 'undefined';
+        const passwordObject = isNew ? null : listManager.get(domObject);
+        const index = isNew ? -1 : listManager.getIndex(domObject);
 
         $editModal.classList.remove('hidden');
         $editModal.setAttribute('data-index', index);
-        $editModalHeader.innerHTML = domObject ? 'New password' : 'Edit password';
-        $titleInput.value          = domObject ? '' : password.title;
-        $urlInput.value            = domObject ? '' : password.url;
-        $userNameInput.value       = domObject ? '' : password.username;
-        $passwordInput.value       = domObject ? '' : password.password;
-        $passwordRepeatInput.value = domObject ? '' : password.password;
-        $commentInput.value        = domObject ? '' : password.comment;
+        $editModalHeader.innerHTML = isNew ? 'New password' : 'Edit password';
+        $titleInput.value          = isNew ? '' : passwordObject.title;
+        $urlInput.value            = isNew ? '' : passwordObject.url;
+        $userNameInput.value       = isNew ? '' : passwordObject.username;
+        $passwordInput.value       = isNew ? '' : passwordObject.password;
+        $passwordRepeatInput.value = isNew ? '' : passwordObject.password;
+        $commentInput.value        = isNew ? '' : passwordObject.comment;
+
+        $titleInput.focus();
     }
 
-    $editModal.addEventListener('click', closeDialog);
-    $masterKeyModal.addEventListener('click', closeDialog);
-    $modalCloseButtonOne.addEventListener('click', closeDialog);
-    $modalCloseButtonTwo.addEventListener('click', closeDialog);
-
-    $saveButton.addEventListener('click', evt => {
+    function saveChanges(evt) {
         evt.preventDefault();
 
         if ($passwordInput.value !== $passwordRepeatInput.value) {
             return window.alert('Passwords do not match!');
         }
 
-        let index = parseInt($editModal.getAttribute('data-index'));
+        const index = parseInt($editModal.getAttribute('data-index'));
         let passwordObject = {
             title: $titleInput.value,
             url: $urlInput.value,
@@ -443,17 +266,35 @@ window.onload = function() {
         }
         else {
             let domObject = $tableBody.firstChild;
-            while (index--) {
+            for (let i = 0; i < index; i++) {
                 domObject = domObject.nextSibling;
             }
 
-            listManager.set(domObject, passwordObject);
+            listManager.set(domObject, passwordObject, index);
         }
 
         sendUpdate().catch(e => window.alert('Failed updating library: ' + e.message));
-
         closeDialog();
-    });
+    }
+
+    function saveMasterKey(evt) {
+        evt.preventDefault();
+
+        if ( ! window.confirm('Are you sure you want to change the master key?')) {
+            return closeDialog();
+        }
+
+        const newKey = $newMasterKeyInput.value;
+        const newKeyRepeat = $newMasterKeyRepeatInput.value;
+
+        if (newKey !== newKeyRepeat) {
+            return window.alert('New keys do not match!');
+        }
+
+        sendUpdate(newKey)
+            .then(closeDialog)
+            .catch(e => window.alert('Failed updating password: ' + e.message));
+    }
 
     function deletePassword(evt) {
         evt.preventDefault();
@@ -468,7 +309,7 @@ window.onload = function() {
 
     function toggleVisibility(evt) {
         let row = this.parentNode.parentNode;
-        this.innerHTML = row.classList.contains('exposed') ? '<i class="icon-eye-off"></i>' : '<i class="icon-eye"></i>';
+        this.innerHTML = row.classList.contains('exposed') ? '<i class="icon-eye"></i>' : '<i class="icon-closed-eye"></i>';
 
         row.classList.toggle('exposed');
         evt.preventDefault();
@@ -487,82 +328,83 @@ window.onload = function() {
         $passwordRepeatInput.value = '';
     }
 
-    function sendUpdate(newHash) {
-        let passwordListPromise = listManager.getPasswordList();
-        let libraryPromise = passwordListPromise.then(passwordList => cryptoManager.encryptPasswordList(passwordList));
+    function sendUpdate(newKey) {
+        let oldHashPromise = cryptoManager.getHash();
+        let libraryPromise = cryptoManager.encryptPasswordList(listManager.getAll(), newKey);
+        let newHashPromise = libraryPromise.then(() => cryptoManager.getHash());
 
-        return libraryPromise.then(signedLib => {
-            downloadPromise = downloadPromise.then(() => signedLib);
-            window.localStorage.setItem('password-library', JSON.stringify(signedLib));
+        return Promise.all([oldHashPromise, libraryPromise, newHashPromise])
+            .then(params => {
+                let [oldHash, signedLib, newHash] = params;
+                downloadPromise = downloadPromise.then(() => signedLib);
+                window.localStorage.setItem(localStorageKey, JSON.stringify(signedLib));
 
-            return postLibraryAsync(
-                uploadUrl,
-                signedLib,
-                passwordHash, // FIXME: woops -- this is trouble! cryptoManager should have encrypt-with-new-key method, and a get-hash method
-                newHash
-            );
-        });
+                return postLibraryAsync(uploadUrl, signedLib, oldHash, newHash);
+            });
     }
 
-    $randomPasswordButton.addEventListener('click', evt => {
-        let newPassword = randPass();
+    function setRandomPassword(evt) {
+        const newPassword = generateRandomPassword();
 
         $passwordInput.value = newPassword;
         $passwordRepeatInput.value = newPassword;
 
         evt.preventDefault();
-    });
-
-    // FIXME: maybe we should just set a css class somewhere and hide these properties in css
-    if (offlineMode) {
-        for(let button of $newPasswordButtonList) {
-            button.parentNode.removeChild(button);
-        }
-
-        for(let button of $newMasterKeyButtonList) {
-            button.parentNode.removeChild(button);
-        }
-    }
-    else {
-        function newPW(evt) {
-            evt.preventDefault();
-            editDialog();
-        }
-
-        function newMasterPW() {
-            evt.preventDefault();
-            $masterKeyModal.classList.remove('hidden');
-        }
-
-        for(let button of $newPasswordButtonList) {
-            button.addEventListener('click', newPW);
-        }
-
-        for(let button of $newMasterKeyButtonList) {
-            button.addEventListener('click', newMasterPW);
-        }
-
-        $saveMasterKeyButton.addEventListener('click', evt => {
-            evt.preventDefault();
-
-            if ( ! window.confirm('Are you sure you want to change the master key?')) {
-                return closeDialog();
-            }
-
-            const newKey = $newMasterKeyInput.value;
-            const newKeyRepeat = $newMasterKeyRepeatInput.value;
-
-            if (newKey !== newKeyRepeat) {
-                return window.alert('New keys do not match!');
-            }
-
-            sendUpdate(newKey)
-                .then(closeDialog)
-                .catch(e => window.alert('Failed updating password: ' + e.message));
-        });
     }
 
-    $filterInput.addEventListener('keyup', function(evt) {
+    function filterList() {
         listManager.filter(this.value);
-    });
+    }
+
+    function newPW(evt) {
+        evt.preventDefault();
+        editDialog();
+    }
+
+    function newMasterPW(evt) {
+        evt.preventDefault();
+        $masterKeyModal.classList.remove('hidden');
+        $newMasterKeyInput.focus();
+    }
+
+    function addLinks(row, offlineMode) {
+        let node = document.createElement('td');
+        let link = document.createElement('a');
+        link.href = '#';
+        link.classList.add('toggleVisibility');
+        link.innerHTML = '<i class="icon-eye"></i>';
+        link.addEventListener('click', toggleVisibility);
+        node.appendChild(link);
+
+        if (! offlineMode) {
+            link = document.createElement('a');
+            link.href = '#';
+            link.classList.add('editPassword');
+            link.innerHTML = '<i class="icon-edit"></i>';
+            link.addEventListener('click', () => editDialog(link));
+            node.appendChild(link);
+
+            link = document.createElement('a');
+            link.href = '#';
+            link.classList.add('deletePassword');
+            link.innerHTML = '<i class="icon-trash"></i>';
+            link.addEventListener('click', deletePassword);
+            node.appendChild(link);
+        }
+
+        row.appendChild(node);
+    }
+
+    function createRenderer(isOffline) {
+        return function(passwordObject) {
+            let row = document.createElement('tr');
+            addLinkCell(row, passwordObject.url, passwordObject.title);
+            addObscuredCell(row, passwordObject.username);
+            addObscuredCell(row, passwordObject.password);
+            addComment(row, passwordObject.comment);
+            addLinks(row, isOffline);
+
+            return row;
+        };
+    }
 };

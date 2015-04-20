@@ -33,7 +33,7 @@ module.exports = function(grunt) {
         es6transpiler: {
             dist: {
                 files: {
-                    'assets/manager-es5.js': 'assets/manager.js'
+                    'assets/manager-es5.js': 'assets/manager-loaded.js',
                 }
             }
         },
@@ -81,6 +81,21 @@ module.exports = function(grunt) {
         }
     });
 
+    grunt.registerTask('load-js-modules', 'Bundles the es6 modules', function() {
+        var transpiler = require('es6-module-transpiler');
+        var Container = transpiler.Container;
+        var FileResolver = transpiler.FileResolver;
+        var BundleFormatter = transpiler.formatters.bundle;
+
+        var container = new Container({
+            resolvers: [new FileResolver(['assets/'])],
+            formatter: new BundleFormatter()
+        });
+
+        container.getModule('manager');
+        container.write('assets/manager-loaded.js');
+    });
+
     grunt.loadNpmTasks('grunt-uncss');
     grunt.loadNpmTasks('grunt-inline-alt');
     grunt.loadNpmTasks('grunt-processhtml');
@@ -91,6 +106,7 @@ module.exports = function(grunt) {
 
     // Default task(s).
     grunt.registerTask('default', [
+        'load-js-modules',
         'es6transpiler',
         'uglify',
         'uncss',

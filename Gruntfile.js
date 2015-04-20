@@ -96,14 +96,6 @@ module.exports = function(grunt) {
         container.write('assets/manager-loaded.js');
     });
 
-    grunt.registerTask('force-transpile', 'Transpile es6 while ignoring warnings', function () {
-        var tasks = ['es6transpiler'];
-
-        // Use the force option for all tasks declared in the previous line
-        grunt.option('force', true);
-        grunt.task.run(tasks);
-    });
-
     grunt.loadNpmTasks('grunt-uncss');
     grunt.loadNpmTasks('grunt-inline-alt');
     grunt.loadNpmTasks('grunt-processhtml');

@@ -1,14 +1,14 @@
 export function getAsync(url) {
-    return ajaxAsync(url, 'GET', {});
+    return ajaxAsync(url, 'GET', []);
 }
 
 export function postAsync(url, params) {
     return ajaxAsync(
         url,
         'POST',
-        {
-            'Content-type': 'application/x-www-form-urlencoded'
-        },
+        [
+            ['Content-type', 'application/x-www-form-urlencoded']
+        ],
         params
     );
 }
@@ -16,6 +16,7 @@ export function postAsync(url, params) {
 function ajaxAsync(url, method, requestHeaders, params) {
     return new Promise(function(resolve, reject) {
         let request = new XMLHttpRequest();
+        request.open(method, url, true);
 
         request.onreadystatechange = function() {
             if(this.readyState === 4) {
@@ -23,16 +24,15 @@ function ajaxAsync(url, method, requestHeaders, params) {
                     reject(request.response);
                 }
                 else {
-                    resolve();
+                    resolve(request.response);
                 }
             }
         };
 
-        for (let key in requestHeaders) {
-            request.setRequestHeader(key, requestHeaders[key]);
+        for (let pair of requestHeaders) {
+            request.setRequestHeader(pair[0], pair[1]);
         }
 
-        request.open(method, url, true);
         request.send(params);
     });
 }

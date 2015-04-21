@@ -72,11 +72,17 @@ function getLibraryVersion($json) {
 
     $object = json_decode($json, true);
 
-    if (null === $object || ! isset($object['library']) || ! isset($object['library']['library_version'])) {
+    if (null === $object || ! isset($object['library'])) {
         dieWithError(400, 'invalid library');
     }
 
-    $version = intval($object['library']['library_version']);
+    $library = json_decode($object['library'], true);
+
+    if (null === $library || ! isset($library['library_version'])) {
+        dieWithError(400, 'invalid library');
+    }
+
+    $version = intval($library['library_version']);
 
     if (0 === $version) {
         dieWithError(400, 'invalid library version');

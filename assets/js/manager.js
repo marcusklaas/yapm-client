@@ -304,7 +304,8 @@ window.onload = function() {
         }
 
         listManager.remove(this);
-        sendUpdate();
+        sendUpdate()
+            .catch(e => window.alert('Failed deleting password: ' + e.message));
     }
 
     function toggleVisibility(evt) {

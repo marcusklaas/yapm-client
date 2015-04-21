@@ -11,7 +11,7 @@ export function getSha1(password) {
         },
         stringToArrayBuffer(password)
     )
-        .then(uintArray => arrayBufferToHexString(uintArray));
+    .then(arrayBufferToHexString);
 }
 
 /**
@@ -28,24 +28,24 @@ export function getAesKey(password) {
         false,
         ["deriveKey"]
     )
-        .then(baseKey =>
-            crypto.subtle.deriveKey(
-                {
-                    "name": "PBKDF2",
-                    "salt": new Uint8Array(16),
-                    "iterations": 4096,
-                    "hash": {
-                        name: "SHA-1"
-                    }
-                },
-                baseKey,
-                {
-                    "name": "AES-CBC",
-                    "length": 256
-                },
-                false,
-                ["encrypt", "decrypt"]
-            )
+    .then(baseKey =>
+        crypto.subtle.deriveKey(
+            {
+                "name": "PBKDF2",
+                "salt": new Uint8Array(16),
+                "iterations": 4096,
+                "hash": {
+                    name: "SHA-1"
+                }
+            },
+            baseKey,
+            {
+                "name": "AES-CBC",
+                "length": 256
+            },
+            false,
+            ["encrypt", "decrypt"]
+        )
     );
 }
 
@@ -89,12 +89,6 @@ function stringToArrayBuffer(string) {
     return encoder.encode(string);
 }
 
-function arrayBufferToString(array) {
-    let decoder = new window.TextDecoder("utf-8");
-
-    return decoder.decode(array);
-}
-
 function bufferViewToArray(buffer) {
     const array = new Uint8Array(buffer);
     let list = [];
@@ -128,9 +122,15 @@ function arrayBufferToHexString(arrayBuffer) {
     return hexString;
 }
 
-export function decryptStringFromBase64(key, version, blob) {
+/**
+ * @param key     AesKey
+ * @param version int
+ * @param blob    string (base64)
+ * @returns Uint8Array
+ */
+export function decryptFromBase64(key, version, blob) {
     const cryptoText = atob(blob);
-    const rawCryptoBytes = cryptoText.split(',').map(function (int) { return parseInt(int); }); // FIXME: this could probably be done more efficiently
+    const rawCryptoBytes = cryptoText.split(',').map(function (int) { return parseInt(int); }); // FIXME: this could probably be done more efficiently -- and move to different function!
     const byteArray = new Uint8Array(rawCryptoBytes);
 
     return crypto.subtle.decrypt(
@@ -141,30 +141,30 @@ export function decryptStringFromBase64(key, version, blob) {
         key,
         byteArray
     )
-        .then(plainText => JSON.parse(arrayBufferToString(plainText)));
+    .then(buffer => new Uint8Array(buffer));
 }
 
 /**
  * @param key     KeyObject
- * @param obj     object
+ * @param  arr    Uint8Array
  * @param version int
  * @returns Promise
  */
-export function encryptObject(key, obj, version) {
+export function encryptUint8Array(key, arr, version) {
     return crypto.subtle.encrypt(
         {
             name: "AES-CBC",
             iv: encodeIvFromNumber(version)
         },
         key,
-        stringToArrayBuffer(JSON.stringify(obj))
+        arr
     )
-        .then(result => bufferViewToBase64(result));
+    .then(bufferViewToBase64);
 }
 
 /**
  * @param key HmacKey
- * @param obj string
+ * @param str string
  * @returns Promise containing string (base64 encoding)
  */
 export function getHmac(key, str) {
@@ -175,7 +175,7 @@ export function getHmac(key, str) {
         key,
         stringToArrayBuffer(str)
     )
-        .then(signature => bufferViewToBase64(signature));
+    .then(bufferViewToBase64);
 }
 
 /**

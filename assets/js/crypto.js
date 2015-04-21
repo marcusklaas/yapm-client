@@ -1,5 +1,5 @@
 import { compressToUint8Array } from './lzstring';
-import { getHmacKey, getAesKey, getSha1, decryptStringFromBase64, verifyHmac, encryptObject, getObjectHmac } from './crypto-primitives'
+import { getHmacKey, getAesKey, getSha1, decryptStringFromBase64, verifyHmac, encryptObject, getHmac } from './crypto-primitives'
 
 // TODO: add crypto/ textDecoder checks
 
@@ -9,7 +9,10 @@ export function createCryptoManager(password, library) {
     let hashPromise = getSha1(password);
 
     let libraryPromise = hmacKeyPromise
-        .then(key => verifyHmac(key, library.library, library.hmac).then(() => library.library));
+        .then(key =>
+            verifyHmac(key, library.library, library.hmac)
+                .then(() => JSON.parse(library.library))
+        );
 
     let libraryVersionPromise = libraryPromise.then(library => library.library_version);
 
@@ -52,13 +55,24 @@ export function createCryptoManager(password, library) {
                 .then(params => encryptObject(params[0], passwordList, params[1]));
 
             libraryPromise = Promise.all([blobPromise, libraryVersionPromise])
-                .then(params => createLibrary(params[0], params[1], 2 /* api version */));
-
-            let hmacPromise = Promise.all([hmacKeyPromise, libraryPromise])
-                .then(params => getObjectHmac(params[0], params[1]));
-
-            return Promise.all([libraryPromise, hmacPromise])
                 .then(params => {
+                    console.log('Creating library');
+
+                    return createLibrary(params[0], params[1], 2 /* api version */)
+                });
+
+            let libraryJsonPromise = libraryPromise.then(JSON.stringify);
+
+            let hmacPromise = Promise.all([hmacKeyPromise, libraryJsonPromise])
+                .then(params => getHmac(params[0], params[1]));
+
+            return Promise.all([libraryJsonPromise, hmacPromise])
+                .then(params => {
+                    console.log({
+                        library: params[0],
+                        hmac: params[1]
+                    });
+
                     return {
                         library: params[0],
                         hmac: params[1]

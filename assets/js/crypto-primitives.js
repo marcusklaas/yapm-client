@@ -164,33 +164,33 @@ export function encryptObject(key, obj, version) {
 
 /**
  * @param key HmacKey
- * @param obj object
+ * @param obj string
  * @returns Promise containing string (base64 encoding)
  */
-export function getObjectHmac(key, obj) {
+export function getHmac(key, str) {
     return crypto.subtle.sign(
         {
             name: "HMAC"
         },
         key,
-        stringToArrayBuffer(JSON.stringify(obj))
+        stringToArrayBuffer(str)
     )
         .then(signature => bufferViewToBase64(signature));
 }
 
 /**
  * @param key  HmacKey
- * @param obj  obj
+ * @param str  string
  * @param hmac string (base64 encoding)
  * @returns Promise
  */
-export function verifyHmac(key, obj, hmac) {
+export function verifyHmac(key, str, hmac) {
     return crypto.subtle.verify(
         {
             name: "HMAC"
         },
         key,
         stringToArrayBuffer(atob(hmac)),
-        stringToArrayBuffer(JSON.stringify(obj))
+        stringToArrayBuffer(str)
     );
 }

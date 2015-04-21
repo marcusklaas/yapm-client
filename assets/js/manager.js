@@ -67,6 +67,15 @@ function addComment(row, text) {
     row.appendChild(node);
 }
 
+function setVisibility(row, isVisible) {
+    if (isVisible) {
+        row.classList.remove('hidden');
+    }
+    else {
+        row.classList.add('hidden');
+    }
+}
+
 /**
  * @param url     string
  * @param library object
@@ -179,7 +188,7 @@ window.onload = function() {
             .then(params => window.localStorage.setItem(localStorageKey, JSON.stringify(params[0])));
 
         listPromise
-            .then(passwordList => getListManager(passwordList, $tableBody, createRenderer(offlineMode)))
+            .then(passwordList => getListManager(passwordList, $tableBody, createRenderer(offlineMode), setVisibility))
             .then(newManager => {
                 listManager = newManager;
 

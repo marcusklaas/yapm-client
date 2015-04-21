@@ -1,5 +1,4 @@
-// TODO: add hider/ unhider method?
-export function getListManager(passwordList, tableBody, passwordRenderer) {
+export function getListManager(passwordList, tableBody, passwordRenderer, visibilitySetter) {
     function getIndex(row) {
         let index = 0;
 
@@ -59,31 +58,25 @@ export function getListManager(passwordList, tableBody, passwordRenderer) {
         getIndex: function (domObject) {
             return getIndex(getRow(domObject));
         },
-        // TODO: try to revise this function in a more functional style
         filter: function(val) {
-            let row = tableBody.firstChild, nextRow;
-            let len = passwordList.length;
-            let tokens = val.toLowerCase().split(' ');
+            const tokenList = val.toLowerCase().split(' ');
+            const passwordCount = passwordList.length; // normally not necessary, but we do mutate passwordList
+            let mismatchCount = 0;
 
-            for(let i = 0, k = 0; i < len; i++, row = nextRow) {
-                nextRow = row.nextSibling;
+            for(let i = 0; i < passwordCount; i++) {
+                const index = i - mismatchCount;
+                const passwordObject = passwordList[index];
+                const searchable = (passwordObject.title + passwordObject.comment).toLowerCase();
+                const isMatch = tokenList.every(token => -1 != searchable.indexOf(token));
+                const row = tableBody.childNodes[index];
 
-                for(let j = 0; j < tokens.length; j++) {
-                    if(-1 === passwordList[k].title.toLowerCase().indexOf(tokens[j])
-                        && -1 === passwordList[k].comment.toLowerCase().indexOf(tokens[j])) {
-                        row.classList.add('hidden');
+                visibilitySetter(row, isMatch);
 
-                        /* place row at bottom of list */
-                        tableBody.insertBefore(row, null);
-
-                        let tmp = passwordList[k];
-                        passwordList.splice(k, 1);
-                        passwordList[len - 1] = tmp;
-                        break;
-                    }
-
-                    row.classList.remove('hidden');
-                    k++;
+                if ( ! isMatch) {
+                    /* place row at bottom of list to preserve zebra colouring */
+                    tableBody.insertBefore(row, null);
+                    passwordList.push(passwordList.splice(index, 1)[0]);
+                    mismatchCount += 1;
                 }
             }
         }

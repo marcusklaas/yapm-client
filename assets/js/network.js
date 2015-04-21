@@ -23,7 +23,7 @@ function ajaxAsync(url, method, requestHeaders, params) {
                     reject(request.response);
                 }
                 else {
-                    resolve();
+                    resolve(request.response);
                 }
             }
         };

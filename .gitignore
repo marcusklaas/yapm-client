@@ -1,3 +1,4 @@
 encrypted/
 .idea/
+build/
 node_modules/

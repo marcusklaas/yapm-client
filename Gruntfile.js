@@ -1,6 +1,5 @@
 module.exports = function(grunt) {
 
-    // Project configuration
     grunt.initConfig({
         pkg: grunt.file.readJSON('package.json'),
 
@@ -9,15 +8,15 @@ module.exports = function(grunt) {
                 options: {
                     tag: ''
                 },
-                src: 'assets/index-tidied.html',
-                dest: 'assets/index-inlined.html'
+                src: 'build/index-tidied.html',
+                dest: 'build/index-inlined.html'
             }
         },
 
         uncss: {
             dist: {
                 files: {
-                    'assets/tidy.css': ['assets/index.html']
+                    'build/css/tidy.css': ['build/index.html']
                 }
             }
         },
@@ -25,7 +24,7 @@ module.exports = function(grunt) {
         processhtml: {
             dist: {
                 files: {
-                    'assets/index-tidied.html': ['assets/index.html']
+                    'build/index-tidied.html': ['build/index.html']
                 }
             }
         },
@@ -33,7 +32,7 @@ module.exports = function(grunt) {
         es6transpiler: {
             dist: {
                 files: {
-                    'assets/manager-es5.js': 'assets/manager-loaded.js',
+                    'build/js/manager-es5.js': 'build/js/manager-loaded.js'
                 }
             }
         },
@@ -41,7 +40,7 @@ module.exports = function(grunt) {
         uglify: {
             dist: {
                 files: {
-                    'assets/manager.min.js': ['assets/manager-es5.js']
+                    'build/js/manager.min.js': ['build/js/manager-es5.js']
                 }
             }
         },
@@ -54,7 +53,7 @@ module.exports = function(grunt) {
                     minifyCSS: true
                 },
                 files: {
-                    'index.html': 'assets/index-inlined.html'
+                    'index.html': 'build/index-inlined.html'
                 }
             }
         },
@@ -78,6 +77,31 @@ module.exports = function(grunt) {
                 ],
                 dest: 'manifest.appcache'
             }
+        },
+
+        copy: {
+            dist: {
+                files: [
+                    {
+                        expand: true,
+                        cwd: 'assets/',
+                        src: ['**'],
+                        dest: 'build/'
+                    }
+                ]
+            }
+        },
+
+        clean: ['build'],
+
+        watch: {
+            src: {
+                files: ['assets/**'],
+                tasks: ['default'],
+                options: {
+                    debounceDelay: 2500,
+                }
+            }
         }
     });
 
@@ -88,14 +112,17 @@ module.exports = function(grunt) {
         var BundleFormatter = transpiler.formatters.bundle;
 
         var container = new Container({
-            resolvers: [new FileResolver(['assets/'])],
+            resolvers: [new FileResolver(['build/js'])],
             formatter: new BundleFormatter()
         });
 
         container.getModule('manager');
-        container.write('assets/manager-loaded.js');
+        container.write('build/js/manager-loaded.js');
     });
 
+    grunt.loadNpmTasks('grunt-contrib-clean');
+    grunt.loadNpmTasks('grunt-contrib-copy');
+    grunt.loadNpmTasks('grunt-contrib-watch');
     grunt.loadNpmTasks('grunt-uncss');
     grunt.loadNpmTasks('grunt-inline-alt');
     grunt.loadNpmTasks('grunt-processhtml');
@@ -104,8 +131,12 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks('grunt-contrib-htmlmin');
     grunt.loadNpmTasks('grunt-manifest');
 
+    grunt.reg
+
     // Default task(s).
     grunt.registerTask('default', [
+        'clean',
+        'copy',
         'load-js-modules',
         'es6transpiler',
         'uglify',

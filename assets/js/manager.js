@@ -20,7 +20,7 @@ let downloadPromise = getAsync(downloadUrl)
         offlineMode = true;
         resolve(cachedLibrary);
     }))
-    .then(raw => JSON.parse(raw));
+    .then(JSON.parse);
 
 function selectText() {
     if (document.selection) {
@@ -95,7 +95,6 @@ window.onload = function() {
     let cryptoManager = null;
     let idleTime = 0;
 
-    /* central definition of dom objects */
     let $masterKeyInput = document.getElementById('encryptionKey');
     let $filterInput = document.getElementById('filter');
     let $titleInput = document.getElementById('title');
@@ -225,7 +224,6 @@ window.onload = function() {
         $masterKeyModal.classList.add('hidden');
     }
 
-    /* undefined domObject means a new password */
     function editDialog(domObject) {
         const isNew = typeof domObject == 'undefined';
         const passwordObject = isNew ? null : listManager.get(domObject);
@@ -332,7 +330,7 @@ window.onload = function() {
     function sendUpdate(newKey) {
         let oldHashPromise = cryptoManager.getHash();
         let libraryPromise = cryptoManager.encryptPasswordList(listManager.getAll(), newKey);
-        let newHashPromise = libraryPromise.then(() => cryptoManager.getHash());
+        let newHashPromise = libraryPromise.then(cryptoManager.getHash);
 
         return Promise.all([oldHashPromise, libraryPromise, newHashPromise])
             .then(params => {

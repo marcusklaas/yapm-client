@@ -1,5 +1,5 @@
-import { compressToUint8Array } from './lzstring';
-import { getHmacKey, getAesKey, getSha1, decryptStringFromBase64, verifyHmac, encryptObject, getHmac } from './crypto-primitives'
+import { compressToUint8Array, decompressFromUint8Array } from './lzstring';
+import { getHmacKey, getAesKey, getSha1, decryptFromBase64, verifyHmac, encryptUint8Array, getHmac } from './crypto-primitives'
 
 // TODO: add crypto/ textDecoder checks
 
@@ -39,8 +39,10 @@ export function createCryptoManager(password, library) {
                 .then(params => {
                     let [key, library] = params;
 
-                    return decryptStringFromBase64(key, library.library_version, library.blob);
-                });
+                    return decryptFromBase64(key, library.library_version, library.blob);
+                })
+                .then(decompressFromUint8Array)
+                .then(JSON.parse);
         },
         encryptPasswordList: function(passwordList, newKey) {
             libraryVersionPromise = libraryVersionPromise.then(libraryVersion => libraryVersion + 1);
@@ -51,15 +53,13 @@ export function createCryptoManager(password, library) {
                 hashPromise = getSha1(newKey);
             }
 
+            const compressedBytes = compressToUint8Array(JSON.stringify(passwordList));
+
             let blobPromise = Promise.all([aesKeyPromise, libraryVersionPromise])
-                .then(params => encryptObject(params[0], passwordList, params[1]));
+                .then(params => encryptUint8Array(params[0], compressedBytes, params[1]));
 
             libraryPromise = Promise.all([blobPromise, libraryVersionPromise])
-                .then(params => {
-                    console.log('Creating library');
-
-                    return createLibrary(params[0], params[1], 2 /* api version */)
-                });
+                .then(params => createLibrary(params[0], params[1], 2 /* api version */));
 
             let libraryJsonPromise = libraryPromise.then(JSON.stringify);
 
@@ -68,11 +68,6 @@ export function createCryptoManager(password, library) {
 
             return Promise.all([libraryJsonPromise, hmacPromise])
                 .then(params => {
-                    console.log({
-                        library: params[0],
-                        hmac: params[1]
-                    });
-
                     return {
                         library: params[0],
                         hmac: params[1]

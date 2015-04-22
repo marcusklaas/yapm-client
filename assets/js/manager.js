@@ -14,7 +14,7 @@ let downloadPromise = getAsync(downloadUrl)
         const cachedLibrary = window.localStorage.getItem(localStorageKey);
 
         if ( ! cachedLibrary) {
-            return reject(new Error('Couldn\'t download library and there was no cached version'));
+            return reject('Couldn\'t download library and there was no cached version');
         }
 
         offlineMode = true;
@@ -65,6 +65,15 @@ function addComment(row, text) {
     table.appendChild(tableRow);
     node.appendChild(table);
     row.appendChild(node);
+}
+
+function setVisibility(row, isVisible) {
+    if (isVisible) {
+        row.classList.remove('hidden');
+    }
+    else {
+        row.classList.add('hidden');
+    }
 }
 
 /**
@@ -179,7 +188,7 @@ window.onload = function() {
             .then(params => window.localStorage.setItem(localStorageKey, JSON.stringify(params[0])));
 
         listPromise
-            .then(passwordList => getListManager(passwordList, $tableBody, createRenderer(offlineMode)))
+            .then(passwordList => getListManager(passwordList, $tableBody, createRenderer(offlineMode), setVisibility))
             .then(newManager => {
                 listManager = newManager;
 
@@ -187,7 +196,7 @@ window.onload = function() {
                 $unauthorizedSection.classList.add('hidden');
                 $filterInput.focus();
             })
-            .catch(error => window.alert('Something went wrong: ' + error.message));
+            .catch(error => window.alert(`Something went wrong: ${error}`));
 
         return false;
     }
@@ -196,7 +205,6 @@ window.onload = function() {
         idleTime = 0;
     }
 
-    // TODO: we can use racing promises for this!! That'd be totally rad, yo!
     function incrementIdleTime() {
         if (++idleTime > maxIdleTime) {
             logout();

@@ -1,11 +1,11 @@
-const crypto = window.crypto || window.msCrypto;
+const realCrypto = (window.crypto || window.msCrypto).subtle;
 
 /**
  * @param password string
  * @returns Promise
  */
 export function getSha1(password) {
-    return crypto.subtle.digest(
+    return realCrypto.digest(
         {
             name: "SHA-1"
         },
@@ -19,7 +19,7 @@ export function getSha1(password) {
  * @returns Promise
  */
 export function getAesKey(password) {
-    return crypto.subtle.importKey(
+    return realCrypto.importKey(
         "raw",
         stringToArrayBuffer(password),
         {
@@ -29,7 +29,7 @@ export function getAesKey(password) {
         ["deriveKey"]
     )
     .then(baseKey =>
-        crypto.subtle.deriveKey(
+        realCrypto.deriveKey(
             {
                 "name": "PBKDF2",
                 "salt": new Uint8Array(16),
@@ -54,7 +54,7 @@ export function getAesKey(password) {
  * @returns Promise
  */
 export function getHmacKey(password) {
-    return crypto.subtle.importKey(
+    return realCrypto.importKey(
         "raw",
         stringToArrayBuffer(password),
         {
@@ -89,21 +89,8 @@ function stringToArrayBuffer(string) {
     return encoder.encode(string);
 }
 
-function bufferViewToArray(buffer) {
-    const array = new Uint8Array(buffer);
-    let list = [];
-
-    for(let i = 0; i < array.length; i++) {
-        list[i] = array[i];
-    }
-
-    return list;
-}
-
-function bufferViewToBase64(buffer) {
-    let list = bufferViewToArray(buffer);
-
-    return btoa(list);
+function bufferToByteArray(buffer) {
+    return new Uint8Array(buffer);
 }
 
 function arrayBufferToHexString(arrayBuffer) {
@@ -123,17 +110,13 @@ function arrayBufferToHexString(arrayBuffer) {
 }
 
 /**
- * @param key     AesKey
- * @param version int
- * @param blob    string (base64)
+ * @param key       AesKey
+ * @param version   int
+ * @param byteArray Uint8Array
  * @returns Uint8Array
  */
-export function decryptFromBase64(key, version, blob) {
-    const cryptoText = atob(blob);
-    const rawCryptoBytes = cryptoText.split(',').map(function (int) { return parseInt(int); }); // FIXME: this could probably be done more efficiently -- and move to different function!
-    const byteArray = new Uint8Array(rawCryptoBytes);
-
-    return crypto.subtle.decrypt(
+export function decrypt(key, version, byteArray) {
+    return realCrypto.decrypt(
         {
             name: "AES-CBC",
             iv: encodeIvFromNumber(version)
@@ -141,7 +124,7 @@ export function decryptFromBase64(key, version, blob) {
         key,
         byteArray
     )
-    .then(buffer => new Uint8Array(buffer));
+    .then(bufferToByteArray);
 }
 
 /**
@@ -151,7 +134,7 @@ export function decryptFromBase64(key, version, blob) {
  * @returns Promise
  */
 export function encryptUint8Array(key, arr, version) {
-    return crypto.subtle.encrypt(
+    return realCrypto.encrypt(
         {
             name: "AES-CBC",
             iv: encodeIvFromNumber(version)
@@ -159,7 +142,7 @@ export function encryptUint8Array(key, arr, version) {
         key,
         arr
     )
-    .then(bufferViewToBase64);
+    .then(bufferToByteArray);
 }
 
 /**
@@ -168,29 +151,29 @@ export function encryptUint8Array(key, arr, version) {
  * @returns Promise containing string (base64 encoding)
  */
 export function getHmac(key, str) {
-    return crypto.subtle.sign(
+    return realCrypto.sign(
         {
             name: "HMAC"
         },
         key,
         stringToArrayBuffer(str)
     )
-    .then(bufferViewToBase64);
+    .then(bufferToByteArray);
 }
 
 /**
  * @param key  HmacKey
  * @param str  string
- * @param hmac string (base64 encoding)
+ * @param hmac Uint8Array
  * @returns Promise
  */
 export function verifyHmac(key, str, hmac) {
-    return crypto.subtle.verify(
+    return realCrypto.verify(
         {
             name: "HMAC"
         },
         key,
-        stringToArrayBuffer(atob(hmac)),
+        hmac,
         stringToArrayBuffer(str)
     );
 }

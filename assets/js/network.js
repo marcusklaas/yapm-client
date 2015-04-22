@@ -21,10 +21,10 @@ function ajaxAsync(url, method, requestHeaders, params) {
         request.onreadystatechange = function() {
             if(this.readyState === 4) {
                 if(this.status !== 200) {
-                    reject(request.response);
+                    reject(request.responseText);
                 }
                 else {
-                    resolve(request.response);
+                    resolve(request.responseText);
                 }
             }
         };

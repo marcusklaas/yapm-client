@@ -1,7 +1,6 @@
 import { compressToUint8Array, decompressFromUint8Array } from './lzstring';
-import { getHmacKey, getAesKey, getSha1, decryptFromBase64, verifyHmac, encryptUint8Array, getHmac } from './crypto-primitives'
-
-// TODO: add crypto/ textDecoder checks
+import { getHmacKey, getAesKey, getSha1, decrypt, verifyHmac, encryptUint8Array, getHmac } from './crypto-primitives'
+import { uint8ToBase64, base64ToUint8 } from './util';
 
 export function createCryptoManager(password, library) {
     let hmacKeyPromise = getHmacKey(password);
@@ -9,10 +8,16 @@ export function createCryptoManager(password, library) {
     let hashPromise = getSha1(password);
 
     let libraryPromise = hmacKeyPromise
-        .then(key =>
-            verifyHmac(key, library.library, library.hmac)
-                .then(() => JSON.parse(library.library))
-        );
+        .then(key => verifyHmac(key, library.library, base64ToUint8(library.hmac)))
+        .then(isValid => new Promise((resolve, reject) => {
+            if (isValid) {
+                resolve();
+            }
+            else {
+                reject('Invalid HMAC');
+            }
+        }))
+        .then(() => JSON.parse(library.library));
 
     let libraryVersionPromise = libraryPromise.then(library => library.library_version);
 
@@ -32,19 +37,17 @@ export function createCryptoManager(password, library) {
     }
 
     return {
-        // FIXME: should this be here? It should only be called once. the list manager should supply the password list
-        getPasswordList: function() {
-            return Promise
-                .all([aesKeyPromise, libraryPromise])
-                .then(params => {
-                    let [key, library] = params;
+        getPasswordList: () => Promise
+            .all([aesKeyPromise, libraryPromise])
+            .then(params => {
+                const [key, library] = params;
+                const byteArray = base64ToUint8(library.blob);
 
-                    return decryptFromBase64(key, library.library_version, library.blob);
-                })
-                .then(decompressFromUint8Array)
-                .then(JSON.parse);
-        },
-        encryptPasswordList: function(passwordList, newKey) {
+                return decrypt(key, library.library_version, byteArray);
+            })
+            .then(decompressFromUint8Array)
+            .then(JSON.parse),
+        encryptPasswordList: (passwordList, newKey) => {
             libraryVersionPromise = libraryVersionPromise.then(libraryVersion => libraryVersion + 1);
 
             if (newKey) {
@@ -56,7 +59,8 @@ export function createCryptoManager(password, library) {
             const compressedBytes = compressToUint8Array(JSON.stringify(passwordList));
 
             let blobPromise = Promise.all([aesKeyPromise, libraryVersionPromise])
-                .then(params => encryptUint8Array(params[0], compressedBytes, params[1]));
+                .then(params => encryptUint8Array(params[0], compressedBytes, params[1]))
+                .then(uint8ToBase64);
 
             libraryPromise = Promise.all([blobPromise, libraryVersionPromise])
                 .then(params => createLibrary(params[0], params[1], 2 /* api version */));
@@ -70,26 +74,18 @@ export function createCryptoManager(password, library) {
                 .then(params => {
                     return {
                         library: params[0],
-                        hmac: params[1]
+                        hmac: uint8ToBase64(params[1])
                     };
                 });
         },
-        getHash: function() {
-            return hashPromise;
-        }
+        getHash: () => hashPromise
     };
 }
 
-export function generateRandomPassword(length, alphabet) {
-    let result = '';
-    let passwordLength = length || 16;
-    let actualAlphabet = alphabet || 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?:;[]~!@#$%^&*()-+/';
-    let alphabetLength = actualAlphabet.length;
+export function generateRandomPassword(length, alphabetHint) {
+    const passwordLength = length || 16;
+    const alphabet = alphabetHint || 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?:;[]~!@#$%^&*()-+/';
+    const getRandomChar = () => alphabet[Math.floor(Math.random() * alphabet.length)];
 
-    for (let i = 0; i < passwordLength; i++) {
-        let index = Math.floor(Math.random() * alphabetLength);
-        result += actualAlphabet[index];
-    }
-
-    return result;
+    return (new Uint8Array(passwordLength)).map(getRandomChar).join('');
 }

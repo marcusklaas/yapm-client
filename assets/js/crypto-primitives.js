@@ -89,21 +89,8 @@ function stringToArrayBuffer(string) {
     return encoder.encode(string);
 }
 
-function bufferViewToArray(buffer) {
-    const array = new Uint8Array(buffer);
-    let list = [];
-
-    for(let i = 0; i < array.length; i++) {
-        list[i] = array[i];
-    }
-
-    return list;
-}
-
-function bufferViewToBase64(buffer) {
-    let list = bufferViewToArray(buffer);
-
-    return btoa(list);
+function bufferToByteArray(buffer) {
+    return new Uint8Array(buffer);
 }
 
 function arrayBufferToHexString(arrayBuffer) {
@@ -123,16 +110,12 @@ function arrayBufferToHexString(arrayBuffer) {
 }
 
 /**
- * @param key     AesKey
- * @param version int
- * @param blob    string (base64)
+ * @param key       AesKey
+ * @param version   int
+ * @param byteArray Uint8Array
  * @returns Uint8Array
  */
-export function decryptFromBase64(key, version, blob) {
-    const cryptoText = atob(blob);
-    const rawCryptoBytes = cryptoText.split(',').map(function (int) { return parseInt(int); }); // FIXME: this could probably be done more efficiently -- and move to different function!
-    const byteArray = new Uint8Array(rawCryptoBytes);
-
+export function decrypt(key, version, byteArray) {
     return realCrypto.decrypt(
         {
             name: "AES-CBC",
@@ -141,7 +124,7 @@ export function decryptFromBase64(key, version, blob) {
         key,
         byteArray
     )
-    .then(buffer => new Uint8Array(buffer));
+    .then(bufferToByteArray);
 }
 
 /**
@@ -159,7 +142,7 @@ export function encryptUint8Array(key, arr, version) {
         key,
         arr
     )
-    .then(bufferViewToBase64);
+    .then(bufferToByteArray);
 }
 
 /**
@@ -175,13 +158,13 @@ export function getHmac(key, str) {
         key,
         stringToArrayBuffer(str)
     )
-    .then(bufferViewToBase64);
+    .then(bufferToByteArray);
 }
 
 /**
  * @param key  HmacKey
  * @param str  string
- * @param hmac string (base64 encoding)
+ * @param hmac Uint8Array
  * @returns Promise
  */
 export function verifyHmac(key, str, hmac) {
@@ -190,7 +173,7 @@ export function verifyHmac(key, str, hmac) {
             name: "HMAC"
         },
         key,
-        stringToArrayBuffer(atob(hmac)),
+        hmac,
         stringToArrayBuffer(str)
     );
 }

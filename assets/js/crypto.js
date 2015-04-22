@@ -1,5 +1,6 @@
 import { compressToUint8Array, decompressFromUint8Array } from './lzstring';
-import { getHmacKey, getAesKey, getSha1, decryptFromBase64, verifyHmac, encryptUint8Array, getHmac } from './crypto-primitives'
+import { getHmacKey, getAesKey, getSha1, decrypt, verifyHmac, encryptUint8Array, getHmac } from './crypto-primitives'
+import { uint8ToBase64, base64ToUint8 } from './util';
 
 export function createCryptoManager(password, library) {
     let hmacKeyPromise = getHmacKey(password);
@@ -7,10 +8,16 @@ export function createCryptoManager(password, library) {
     let hashPromise = getSha1(password);
 
     let libraryPromise = hmacKeyPromise
-        .then(key =>
-            verifyHmac(key, library.library, library.hmac)
-                .then(() => JSON.parse(library.library))
-        );
+        .then(key => verifyHmac(key, library.library, base64ToUint8(library.hmac)))
+        .then(isValid => new Promise((resolve, reject) => {
+            if (isValid) {
+                resolve();
+            }
+            else {
+                reject('Invalid HMAC');
+            }
+        }))
+        .then(() => JSON.parse(library.library));
 
     let libraryVersionPromise = libraryPromise.then(library => library.library_version);
 
@@ -33,9 +40,10 @@ export function createCryptoManager(password, library) {
         getPasswordList: () => Promise
             .all([aesKeyPromise, libraryPromise])
             .then(params => {
-                let [key, library] = params;
+                const [key, library] = params;
+                const byteArray = base64ToUint8(library.blob);
 
-                return decryptFromBase64(key, library.library_version, library.blob);
+                return decrypt(key, library.library_version, byteArray);
             })
             .then(decompressFromUint8Array)
             .then(JSON.parse),
@@ -51,7 +59,8 @@ export function createCryptoManager(password, library) {
             const compressedBytes = compressToUint8Array(JSON.stringify(passwordList));
 
             let blobPromise = Promise.all([aesKeyPromise, libraryVersionPromise])
-                .then(params => encryptUint8Array(params[0], compressedBytes, params[1]));
+                .then(params => encryptUint8Array(params[0], compressedBytes, params[1]))
+                .then(uint8ToBase64);
 
             libraryPromise = Promise.all([blobPromise, libraryVersionPromise])
                 .then(params => createLibrary(params[0], params[1], 2 /* api version */));
@@ -65,7 +74,7 @@ export function createCryptoManager(password, library) {
                 .then(params => {
                     return {
                         library: params[0],
-                        hmac: params[1]
+                        hmac: uint8ToBase64(params[1])
                     };
                 });
         },

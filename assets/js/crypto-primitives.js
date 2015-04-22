@@ -1,11 +1,11 @@
-const crypto = window.crypto || window.msCrypto;
+const realCrypto = (window.crypto || window.msCrypto).subtle;
 
 /**
  * @param password string
  * @returns Promise
  */
 export function getSha1(password) {
-    return crypto.subtle.digest(
+    return realCrypto.digest(
         {
             name: "SHA-1"
         },
@@ -19,7 +19,7 @@ export function getSha1(password) {
  * @returns Promise
  */
 export function getAesKey(password) {
-    return crypto.subtle.importKey(
+    return realCrypto.importKey(
         "raw",
         stringToArrayBuffer(password),
         {
@@ -29,7 +29,7 @@ export function getAesKey(password) {
         ["deriveKey"]
     )
     .then(baseKey =>
-        crypto.subtle.deriveKey(
+        realCrypto.deriveKey(
             {
                 "name": "PBKDF2",
                 "salt": new Uint8Array(16),
@@ -54,7 +54,7 @@ export function getAesKey(password) {
  * @returns Promise
  */
 export function getHmacKey(password) {
-    return crypto.subtle.importKey(
+    return realCrypto.importKey(
         "raw",
         stringToArrayBuffer(password),
         {
@@ -133,7 +133,7 @@ export function decryptFromBase64(key, version, blob) {
     const rawCryptoBytes = cryptoText.split(',').map(function (int) { return parseInt(int); }); // FIXME: this could probably be done more efficiently -- and move to different function!
     const byteArray = new Uint8Array(rawCryptoBytes);
 
-    return crypto.subtle.decrypt(
+    return realCrypto.decrypt(
         {
             name: "AES-CBC",
             iv: encodeIvFromNumber(version)
@@ -151,7 +151,7 @@ export function decryptFromBase64(key, version, blob) {
  * @returns Promise
  */
 export function encryptUint8Array(key, arr, version) {
-    return crypto.subtle.encrypt(
+    return realCrypto.encrypt(
         {
             name: "AES-CBC",
             iv: encodeIvFromNumber(version)
@@ -168,7 +168,7 @@ export function encryptUint8Array(key, arr, version) {
  * @returns Promise containing string (base64 encoding)
  */
 export function getHmac(key, str) {
-    return crypto.subtle.sign(
+    return realCrypto.sign(
         {
             name: "HMAC"
         },
@@ -185,7 +185,7 @@ export function getHmac(key, str) {
  * @returns Promise
  */
 export function verifyHmac(key, str, hmac) {
-    return crypto.subtle.verify(
+    return realCrypto.verify(
         {
             name: "HMAC"
         },

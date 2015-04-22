@@ -14,7 +14,7 @@ let downloadPromise = getAsync(downloadUrl)
         const cachedLibrary = window.localStorage.getItem(localStorageKey);
 
         if ( ! cachedLibrary) {
-            return reject(new Error('Couldn\'t download library and there was no cached version'));
+            return reject('Couldn\'t download library and there was no cached version');
         }
 
         offlineMode = true;
@@ -196,7 +196,7 @@ window.onload = function() {
                 $unauthorizedSection.classList.add('hidden');
                 $filterInput.focus();
             })
-            .catch(error => window.alert('Something went wrong: ' + error.message));
+            .catch(error => window.alert(`Something went wrong: ${error}`));
 
         return false;
     }
@@ -205,7 +205,6 @@ window.onload = function() {
         idleTime = 0;
     }
 
-    // TODO: we can use racing promises for this!! That'd be totally rad, yo!
     function incrementIdleTime() {
         if (++idleTime > maxIdleTime) {
             logout();

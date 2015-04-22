@@ -1,8 +1,6 @@
 import { compressToUint8Array, decompressFromUint8Array } from './lzstring';
 import { getHmacKey, getAesKey, getSha1, decryptFromBase64, verifyHmac, encryptUint8Array, getHmac } from './crypto-primitives'
 
-// TODO: add crypto/ textDecoder checks
-
 export function createCryptoManager(password, library) {
     let hmacKeyPromise = getHmacKey(password);
     let aesKeyPromise = getAesKey(password);
@@ -32,19 +30,16 @@ export function createCryptoManager(password, library) {
     }
 
     return {
-        // FIXME: should this be here? It should only be called once. the list manager should supply the password list
-        getPasswordList: function() {
-            return Promise
-                .all([aesKeyPromise, libraryPromise])
-                .then(params => {
-                    let [key, library] = params;
+        getPasswordList: () => Promise
+            .all([aesKeyPromise, libraryPromise])
+            .then(params => {
+                let [key, library] = params;
 
-                    return decryptFromBase64(key, library.library_version, library.blob);
-                })
-                .then(decompressFromUint8Array)
-                .then(JSON.parse);
-        },
-        encryptPasswordList: function(passwordList, newKey) {
+                return decryptFromBase64(key, library.library_version, library.blob);
+            })
+            .then(decompressFromUint8Array)
+            .then(JSON.parse),
+        encryptPasswordList: (passwordList, newKey) => {
             libraryVersionPromise = libraryVersionPromise.then(libraryVersion => libraryVersion + 1);
 
             if (newKey) {
@@ -74,22 +69,14 @@ export function createCryptoManager(password, library) {
                     };
                 });
         },
-        getHash: function() {
-            return hashPromise;
-        }
+        getHash: () => hashPromise
     };
 }
 
-export function generateRandomPassword(length, alphabet) {
-    let result = '';
-    let passwordLength = length || 16;
-    let actualAlphabet = alphabet || 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?:;[]~!@#$%^&*()-+/';
-    let alphabetLength = actualAlphabet.length;
+export function generateRandomPassword(length, alphabetHint) {
+    const passwordLength = length || 16;
+    const alphabet = alphabetHint || 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?:;[]~!@#$%^&*()-+/';
+    const getRandomChar = () => alphabet[Math.floor(Math.random() * alphabet.length)];
 
-    for (let i = 0; i < passwordLength; i++) {
-        let index = Math.floor(Math.random() * alphabetLength);
-        result += actualAlphabet[index];
-    }
-
-    return result;
+    return (new Uint8Array(passwordLength)).map(getRandomChar).join('');
 }

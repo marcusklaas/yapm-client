@@ -2,22 +2,23 @@ import { compressToUint8Array, decompressFromUint8Array } from './lzstring';
 import { getHmacKey, getAesKey, getSha1, decrypt, verifyHmac, encryptUint8Array, getHmac } from './crypto-primitives'
 import { uint8ToBase64, base64ToUint8 } from './util';
 
+const apiVersion = 3;
+
 export function createCryptoManager(password, library) {
     let hmacKeyPromise = getHmacKey(password);
-    let aesKeyPromise = getAesKey(password);
-    let hashPromise = getSha1(password);
+    let aesKeyPromise  = getAesKey(password);
+    let hashPromise    = getSha1(password);
 
     let libraryPromise = hmacKeyPromise
         .then(key => verifyHmac(key, library.library, base64ToUint8(library.hmac)))
-        .then(isValid => new Promise((resolve, reject) => {
-            if (isValid) {
-                resolve();
-            }
-            else {
-                reject('Invalid HMAC');
-            }
-        }))
-        .then(() => JSON.parse(library.library));
+        .then(isValid => new Promise((resolve, reject) => isValid ? resolve() : reject('Invalid HMAC')))
+        .then(() => JSON.parse(library.library))
+        .then(library => new Promise((resolve, reject) =>
+                library.api_version === apiVersion
+                    ? resolve(library)
+                    : reject(`Library api version mismatch. Expected ${apiVersion}, got ${library.api_version}`)
+            )
+        );
 
     let libraryVersionPromise = libraryPromise.then(library => library.library_version);
 
@@ -47,6 +48,7 @@ export function createCryptoManager(password, library) {
             })
             .then(decompressFromUint8Array)
             .then(JSON.parse),
+
         encryptPasswordList: (passwordList, newKey) => {
             libraryVersionPromise = libraryVersionPromise.then(libraryVersion => libraryVersion + 1);
 
@@ -63,7 +65,7 @@ export function createCryptoManager(password, library) {
                 .then(uint8ToBase64);
 
             libraryPromise = Promise.all([blobPromise, libraryVersionPromise])
-                .then(params => createLibrary(params[0], params[1], 2 /* api version */));
+                .then(params => createLibrary(params[0], params[1], apiVersion));
 
             let libraryJsonPromise = libraryPromise.then(JSON.stringify);
 
@@ -78,6 +80,7 @@ export function createCryptoManager(password, library) {
                     };
                 });
         },
+
         getHash: () => hashPromise
     };
 }

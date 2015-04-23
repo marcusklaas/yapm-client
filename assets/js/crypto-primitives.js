@@ -68,7 +68,6 @@ export function getHmacKey(password) {
     );
 }
 
-// encode num in little endian format
 export function encodeIvFromNumber(num) {
     // iv is 16 bytes long
     let iv = new Uint8Array(16);

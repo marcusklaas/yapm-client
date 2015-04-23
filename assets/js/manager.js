@@ -1,24 +1,21 @@
+import { config } from './config';
 import { createCryptoManager, generateRandomPassword } from './crypto';
 import { postAsync, getAsync } from './network';
 import { getListManager } from './listManager';
 
-const downloadUrl = 'encrypted/passwords.txt?noCache=' + Math.floor(Math.random() * 1e6);
-const uploadUrl = 'libupdate.php';
-const localStorageKey = 'password-library';
-const maxIdleTime = 20; // seconds
-let offlineMode = false;
-
 // start download as early as possible
-let downloadPromise = getAsync(downloadUrl)
+const downloadPromise = getAsync(config.downloadUrl);
+
+let outerLibraryPromise = downloadPromise
     .catch(() => new Promise((resolve, reject) => {
-        const cachedLibrary = window.localStorage.getItem(localStorageKey);
+        const cachedLibrary = window.localStorage.getItem(config.localStorageKey);
 
-        if ( ! cachedLibrary) {
-            return reject('Couldn\'t download library and there was no cached version');
+        if (cachedLibrary) {
+            resolve(cachedLibrary);
         }
-
-        offlineMode = true;
-        resolve(cachedLibrary);
+        else {
+            reject('Couldn\'t download library and there was no cached version');
+        }
     }))
     .then(JSON.parse);
 
@@ -150,26 +147,27 @@ window.onload = function() {
     document.onmousemove = resetIdleTime;
 
     // FIXME: maybe we should just set a css class somewhere and hide these properties in css
-    if (offlineMode) {
-        for(let button of $newPasswordButtonList) {
-            button.parentNode.removeChild(button);
-        }
+    downloadPromise
+        .then(() => {
+            for(let button of $newPasswordButtonList) {
+                button.parentNode.removeChild(button);
+            }
 
-        for(let button of $newMasterKeyButtonList) {
-            button.parentNode.removeChild(button);
-        }
-    }
-    else {
-        for(let button of $newPasswordButtonList) {
-            button.addEventListener('click', newPW);
-        }
+            for(let button of $newMasterKeyButtonList) {
+                button.parentNode.removeChild(button);
+            }
+        })
+        .catch(() => {
+            for(let button of $newPasswordButtonList) {
+                button.addEventListener('click', newPW);
+            }
 
-        for(let button of $newMasterKeyButtonList) {
-            button.addEventListener('click', newMasterPW);
-        }
+            for(let button of $newMasterKeyButtonList) {
+                button.addEventListener('click', newMasterPW);
+            }
 
-        $saveMasterKeyButton.addEventListener('click', saveMasterKey);
-    }
+            $saveMasterKeyButton.addEventListener('click', saveMasterKey);
+        });
 
     function decryptPage(evt) {
         evt.preventDefault();
@@ -177,18 +175,20 @@ window.onload = function() {
         const password = $masterKeyInput.value;
         $masterKeyInput.value = '';
 
-        let listPromise = downloadPromise
+        const listPromise = outerLibraryPromise
             .then(library => createCryptoManager(password, library))
             .then(newManager => {
                 return cryptoManager = newManager;
             })
             .then(newManager => newManager.getPasswordList());
 
-        Promise.all([downloadPromise, listPromise])
-            .then(params => window.localStorage.setItem(localStorageKey, JSON.stringify(params[0])));
+        Promise.all([outerLibraryPromise, listPromise])
+            .then(params => window.localStorage.setItem(config.localStorageKey, JSON.stringify(params[0])));
 
-        listPromise
-            .then(passwordList => getListManager(passwordList, $tableBody, createRenderer(offlineMode), setVisibility))
+        const onlinePromise = downloadPromise.then(() => true).catch(() => false);
+
+        Promise.all([listPromise, onlinePromise])
+            .then(params => getListManager(params[0], $tableBody, createRenderer(params[1]), setVisibility))
             .then(newManager => {
                 listManager = newManager;
 
@@ -206,7 +206,7 @@ window.onload = function() {
     }
 
     function incrementIdleTime() {
-        if (++idleTime > maxIdleTime) {
+        if (++idleTime > config.maxIdleTime) {
             logout();
         }
     }
@@ -343,10 +343,10 @@ window.onload = function() {
         return Promise.all([oldHashPromise, libraryPromise, newHashPromise])
             .then(params => {
                 let [oldHash, signedLib, newHash] = params;
-                downloadPromise = downloadPromise.then(() => signedLib);
-                window.localStorage.setItem(localStorageKey, JSON.stringify(signedLib));
+                outerLibraryPromise = outerLibraryPromise.then(() => signedLib);
+                window.localStorage.setItem(config.localStorageKey, JSON.stringify(signedLib));
 
-                return postLibraryAsync(uploadUrl, signedLib, oldHash, newHash);
+                return postLibraryAsync(config.uploadUrl, signedLib, oldHash, newHash);
             });
     }
 

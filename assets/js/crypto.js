@@ -11,7 +11,7 @@ export function createCryptoManager(password, library) {
 
     let libraryPromise = hmacKeyPromise
         .then(key => verifyHmac(key, library.library, base64ToUint8(library.hmac)))
-        .then(isValid => new Promise((resolve, reject) => isValid ? resolve() : reject('Invalid HMAC')))
+        .then(isValid => new Promise((resolve, reject) => isValid ? resolve() : reject('Invalid password or HMAC')))
         .then(() => JSON.parse(library.library))
         .then(library => new Promise((resolve, reject) =>
                 library.api_version === apiVersion

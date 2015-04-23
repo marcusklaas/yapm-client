@@ -96,11 +96,21 @@ module.exports = function(grunt) {
 
         watch: {
             src: {
-                files: ['assets/**'],
+                files: ['assets/**', 'config.json'],
                 tasks: ['default'],
                 options: {
-                    debounceDelay: 2500,
+                    debounceDelay: 2500
                 }
+            }
+        },
+
+        config: {
+            basic: {
+                options: {
+                    namespace: 'export const config'
+                },
+                src: 'config.json',
+                dest: 'build/js/config.js'
             }
         }
     });
@@ -130,13 +140,13 @@ module.exports = function(grunt) {
     grunt.loadNpmTasks('grunt-contrib-uglify');
     grunt.loadNpmTasks('grunt-contrib-htmlmin');
     grunt.loadNpmTasks('grunt-manifest');
-
-    grunt.reg
+    grunt.loadNpmTasks('grunt-global-config');
 
     // Default task(s).
     grunt.registerTask('default', [
         'clean',
         'copy',
+        'config',
         'load-js-modules',
         'es6transpiler',
         'uglify',

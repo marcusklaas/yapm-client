@@ -5,7 +5,7 @@ This is a super straight-forward single-user json/aes-based online password mana
 
 This software is designed for a single user, to be run on a server he or she trusts. The greatest security risk lies in any one altering the client code. If someone has write access to the HTML or javascript files, they can alter it to steal your master password after you've entered it. For these reasons, always send the HTML and javascript over an encrypted connection. Also, make sure that no one can alter these files on the server.
 
-PHP should have write access for the encrypted folder, your HTTP server should have read access for `index.html`.
+Your HTTP server should have read access for `index.html`.
 
 Features:
 - access to all your passwords from any machine with an internet connection!
@@ -25,14 +25,16 @@ Coming soon:
 Getting started
 ===============
 
-- Make sure you have HTTPS server installed with a PHP module.
-- Clone the repo: `$ git clone https://www.github.com/marcusklaas/yet-another-password-manager`
-- Set the permissions: `$ chmod 777 encrypted/* encrypted && chmod 555 index.html libupdate.php` 
+- Make sure you have HTTPS server installed.
+- Install a yapm server such as the [yapm php server](https://www.github.com/marcusklaas/yapm-php-server)
+- Clone the repo in a directory that is served by your http server: `$ git clone https://www.github.com/marcusklaas/yapm-client yapm`
+- Set the permissions: `$ cd yapm && chmod 777 encrypted/* encrypted && chmod 555 index.html libupdate.php` 
+- Set the configuration `$ $EDITOR config.json`
 - Login to the password manager and log in with the default password `changeme`.
 - Change your master password by pressing the button in the top right.
 
 Build process
-================
+=============
 
 - Install the dependencies: `$ sudo npm install`
 - Edit the configuration: `$ vim config.json`

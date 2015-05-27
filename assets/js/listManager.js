@@ -17,7 +17,7 @@ export function getListManager(passwordList, tableBody, passwordRenderer, visibi
         return domObject;
     }
 
-    function addPassword(passwordObject) {
+    function renderPassword(passwordObject) {
         const domObject = passwordRenderer(passwordObject);
 
         tableBody.appendChild(domObject);
@@ -26,11 +26,14 @@ export function getListManager(passwordList, tableBody, passwordRenderer, visibi
     tableBody.innerHTML = '';
 
     for (let password of passwordList) {
-        addPassword(password);
+        renderPassword(password);
     }
 
     return {
-        add: addPassword,
+        add: function(passwordObject) {
+            passwordList.push(passwordObject);
+            renderPassword(passwordObject);
+        },
         get: function(domObject) {
             const row = getRow(domObject);
             const index = getIndex(row);

@@ -1,6 +1,5 @@
 {
-  "downloadUrl": "encrypted/passwords.txt",
-  "uploadUrl": "libupdate.php",
+  "apiEndPoint": "https://marcusklaas.nl/passwords-api/",
   "localStorageKey": "password-library",
   "maxIdleTime": 20
 }

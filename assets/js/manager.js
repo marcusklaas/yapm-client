@@ -4,7 +4,7 @@ import { postAsync, getAsync } from './network';
 import { getListManager } from './listManager';
 
 // start download as early as possible
-const downloadPromise = getAsync(config.downloadUrl);
+const downloadPromise = getAsync(config.apiEndPoint);
 
 let outerLibraryPromise = downloadPromise
     .catch(() => new Promise((resolve, reject) => {
@@ -150,15 +150,6 @@ window.onload = function() {
     downloadPromise
         .then(() => {
             for(let button of $newPasswordButtonList) {
-                button.parentNode.removeChild(button);
-            }
-
-            for(let button of $newMasterKeyButtonList) {
-                button.parentNode.removeChild(button);
-            }
-        })
-        .catch(() => {
-            for(let button of $newPasswordButtonList) {
                 button.addEventListener('click', newPW);
             }
 
@@ -167,6 +158,15 @@ window.onload = function() {
             }
 
             $saveMasterKeyButton.addEventListener('click', saveMasterKey);
+        })
+        .catch(() => {
+            for(let button of $newPasswordButtonList) {
+                button.parentNode.removeChild(button);
+            }
+
+            for(let button of $newMasterKeyButtonList) {
+                button.parentNode.removeChild(button);
+            }
         });
 
     function decryptPage(evt) {
@@ -279,7 +279,7 @@ window.onload = function() {
             listManager.set(domObject, passwordObject, index);
         }
 
-        sendUpdate().catch(e => window.alert('Failed updating library: ' + e.message));
+        sendUpdate().catch(msg => window.alert('Failed updating library: ' + msg));
         closeDialog();
     }
 
@@ -299,7 +299,7 @@ window.onload = function() {
 
         sendUpdate(newKey)
             .then(closeDialog)
-            .catch(e => window.alert('Failed updating password: ' + e.message));
+            .catch(msg => window.alert('Failed updating password: ' + msg));
     }
 
     function deletePassword(evt) {
@@ -311,7 +311,7 @@ window.onload = function() {
 
         listManager.remove(this);
         sendUpdate()
-            .catch(e => window.alert('Failed deleting password: ' + e.message));
+            .catch(msg => window.alert('Failed deleting password: ' + msg));
     }
 
     function toggleVisibility(evt) {
@@ -346,7 +346,7 @@ window.onload = function() {
                 outerLibraryPromise = outerLibraryPromise.then(() => signedLib);
                 window.localStorage.setItem(config.localStorageKey, JSON.stringify(signedLib));
 
-                return postLibraryAsync(config.uploadUrl, signedLib, oldHash, newHash);
+                return postLibraryAsync(config.apiEndPoint, signedLib, oldHash, newHash);
             });
     }
 
@@ -374,7 +374,7 @@ window.onload = function() {
         $newMasterKeyInput.focus();
     }
 
-    function addLinks(row, offlineMode) {
+    function addLinks(row, isOnline) {
         let node = document.createElement('td');
         let link = document.createElement('a');
         link.href = '#';
@@ -383,7 +383,7 @@ window.onload = function() {
         link.addEventListener('click', toggleVisibility);
         node.appendChild(link);
 
-        if (! offlineMode) {
+        if (isOnline) {
             link = document.createElement('a');
             link.href = '#';
             link.classList.add('editPassword');
@@ -402,14 +402,14 @@ window.onload = function() {
         row.appendChild(node);
     }
 
-    function createRenderer(isOffline) {
+    function createRenderer(isOnline) {
         return function(passwordObject) {
             let row = document.createElement('tr');
             addLinkCell(row, passwordObject.url, passwordObject.title);
             addObscuredCell(row, passwordObject.username);
             addObscuredCell(row, passwordObject.password);
             addComment(row, passwordObject.comment);
-            addLinks(row, isOffline);
+            addLinks(row, isOnline);
 
             return row;
         };

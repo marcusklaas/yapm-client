@@ -28,7 +28,7 @@ Getting started
 - Make sure you have HTTPS server installed.
 - Install a yapm server such as the [yapm php server](https://www.github.com/marcusklaas/yapm-server)
 - Clone the repo in a directory that is served by your http server: `$ git clone https://www.github.com/marcusklaas/yapm-client yapm`
-- Set the permissions: `$ cd yapm && chmod 777 encrypted/* encrypted && chmod 555 index.html libupdate.php` 
+- Set the permissions: `$ chmod 555 yapm/index.html` 
 - Set the configuration `$ $EDITOR config.json`
 - Login to the password manager and log in with the default password `changeme`.
 - Change your master password by pressing the button in the top right.

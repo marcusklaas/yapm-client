@@ -26,7 +26,7 @@ Getting started
 ===============
 
 - Make sure you have HTTPS server installed.
-- Install a yapm server such as the [yapm php server](https://www.github.com/marcusklaas/yapm-php-server)
+- Install a yapm server such as the [yapm php server](https://www.github.com/marcusklaas/yapm-server)
 - Clone the repo in a directory that is served by your http server: `$ git clone https://www.github.com/marcusklaas/yapm-client yapm`
 - Set the permissions: `$ cd yapm && chmod 777 encrypted/* encrypted && chmod 555 index.html libupdate.php` 
 - Set the configuration `$ $EDITOR config.json`

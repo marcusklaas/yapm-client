@@ -10,7 +10,7 @@ Your HTTP server should have read access for `index.html`.
 Features:
 - access to all your passwords from any machine with an internet connection!
 - low code complexity. All the code client is contained within `assets/js` with no dependencies on external libraries. The web cryptography API is used for speed and reliability.
-- snappy. We use a grunt build process which inlines all images, stylesheets, fonts and javascript into the html. This results in a single file download which is about 50 KB compressed.
+- snappy. We use a grunt build process which inlines all images, stylesheets, fonts and javascript into the html. This results in a single file download which is about 18 kilobyte after compression.
 - relatively secure. We use AES256 in CBC mode for our encryption and then use HMAC to sign the library. This makes it near impossible for any one to read or alter your password library without you noticing.
 - semi-decent filtering. Hit CTRL-E to filter your passwords, each token is matched independently in title and comment.
 - automatic logout. After 20 seconds of idling, you log out automatically.
@@ -36,6 +36,7 @@ Getting started
 Build process
 =============
 
+- Make sure you have a recent version of (>= 6.0) nodejs and grunt installed.
 - Install the dependencies: `$ sudo npm install`
 - Edit the configuration: `$ vim config.json`
 - Build the client `$ grunt`

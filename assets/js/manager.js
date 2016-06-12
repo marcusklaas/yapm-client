@@ -316,7 +316,7 @@ window.onload = function() {
 
     function toggleVisibility(evt) {
         let row = this.parentNode.parentNode;
-        this.innerHTML = row.classList.contains('exposed') ? '<i class="icon-eye"></i>' : '<i class="icon-closed-eye"></i>';
+        this.innerHTML = row.classList.contains('exposed') ? '<i class="icon-eye"></i>' : '<i class="icon-eye-off"></i>';
 
         row.classList.toggle('exposed');
         evt.preventDefault();

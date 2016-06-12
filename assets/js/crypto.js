@@ -90,5 +90,5 @@ export function generateRandomPassword(length, alphabetHint) {
     const alphabet = alphabetHint || 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789.,?:;[]~!@#$%^&*()-+/';
     const getRandomChar = () => alphabet[Math.floor(Math.random() * alphabet.length)];
 
-    return (new Uint8Array(passwordLength)).map(getRandomChar).join('');
+    return Array.from({length: passwordLength}, getRandomChar).join('');
 }

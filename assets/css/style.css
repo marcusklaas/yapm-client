@@ -14,6 +14,7 @@ html, body {
 
 #encryptionKey {
     width: 300px;
+    margin-right: 7px;
 }
 
 nav[role=navigation] {
@@ -75,7 +76,7 @@ h1 {
 }
 
 .wide-container {
-    padding: 53px 27px 0 27px;
+    padding: 52px 27px 0 27px;
 }
 
 table#overview td:last-child {
@@ -124,4 +125,23 @@ table#tableHeader th:nth-child(-n+3), table#overview td:nth-child(-n+3) {
     min-width: 200px;
     max-width: 200px;
     overflow: hidden;
+}
+
+alert {
+    width: 100%;
+    padding: 1.5em;
+    bottom: 0;
+    background: #4CAF50;
+    position: fixed;
+    left: 0;
+    animation: fadeOut 2s forwards;
+    animation-delay: 1s;
+    color: #FFF;
+    opacity: 0.83;
+    z-index: 5;
+}
+
+@keyframes fadeOut {
+    0% { }
+    100% { transform: translateY(5em); opacity: 0.5; }
 }

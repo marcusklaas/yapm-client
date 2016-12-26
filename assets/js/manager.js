@@ -330,6 +330,11 @@ window.onload = function() {
 
         try {  
             var successful = document.execCommand('copy');
+
+            let alertBox = document.createElement('alert');
+            alertBox.innerHTML = "<strong>Copied!</strong> The password is now in your clipboard and ready for use.";
+            $authorizedSection.appendChild(alertBox);
+            window.setTimeout(() => $authorizedSection.removeChild(alertBox), 10000);
         } catch(err) {  
             window.alert('Oops, unable to copy');  
         }

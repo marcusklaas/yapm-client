@@ -1,7 +1,7 @@
 yet another password manager
 ============================
 
-**NOTE**: This repository is no longer maintained. The future is elm, and it is [here](https://github.com/JordyMoos/elm-yapm-client).
+**NOTE**: This repository is no longer being maintained. The future is elm, and it is [here](https://github.com/JordyMoos/elm-yapm-client).
 
 
 This is a super straight-forward single-user json/aes-based online password manager. It stores your passwords in a JSON format on the server with AES-256-CBC encryption. No passwords or keys are stored on the server. You can access the passwords via a local client made in HTML/ javascript. All cryptography is done on the client. A double SHA1-hash of your master password is stored on the server side so it can make sure only authorized users can update the password database.
